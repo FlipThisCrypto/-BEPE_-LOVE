@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bepe Love — 2,222 wizard-coded NFTs on Chia</title>
+  <meta name="description" content="Bepe Love is a 2,222-piece generative NFT collection on the Chia blockchain. Wizard culture, Tang Gang energy, and a card-based auto-battler powered by your Bepes." />
+  <meta name="theme-color" content="#06040f" />
+
+  <!-- OG / social -->
+  <meta property="og:title" content="Bepe Love — 2,222 wizard-coded NFTs on Chia" />
+  <meta property="og:description" content="Pixel-infused magic, Tang Gang energy, and a card auto-battler. Mint, collect, and play your Bepes." />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://rsms.me/" crossorigin />
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+  <link rel="stylesheet" href="css/base.css" />
+</head>
+<body>
+  <main class="page">
+    <header>
+      <a class="brand" href="/">
+        <div class="brand-mark">♥</div>
+        <div>$BEPE $LOVE</div>
+      </a>
+      <nav>
+        <a href="#about">About</a>
+        <a href="#collection">Collection</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#mint">Mint</a>
+        <a class="cta" href="play.html">Play</a>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+      <div>
+        <div class="eyebrow">Wizard Token Energy • Tang Gang Orange • Chia NFT</div>
+        <h1><span class="gradient">Bepe<br />Love</span></h1>
+        <p class="lead">
+          A 2,222-piece generative collection blending chaotic meme energy, wizard culture,
+          and pixel-infused magic on Chia. Every Bepe is a card. Higher points hit harder.
+          Stack a hand, run the auto-battler, climb the leaderboard.
+        </p>
+        <div class="actions">
+          <a class="btn primary" href="play.html">Play the Auto-Battler</a>
+          <a class="btn" href="#mint">Mint / Collect</a>
+          <button class="btn ghost" onclick="randomSpin()">Random Spin</button>
+        </div>
+        <div class="stats" id="heroStats">
+          <!-- filled by landing.js from data/stats.json -->
+          <div class="stat"><strong>2,222</strong><span>Bepes</span></div>
+          <div class="stat"><strong>—</strong><span>Top Power</span></div>
+          <div class="stat"><strong>—</strong><span>Tang Lords</span></div>
+          <div class="stat"><strong>Chia</strong><span>NFT Chain</span></div>
+        </div>
+      </div>
+
+      <div class="carousel-shell" aria-label="Featured Bepes carousel">
+        <div class="halo"></div>
+        <div class="spin-badge" id="spinBadge">Free Spinning</div>
+        <div class="carousel" id="carousel"></div>
+        <div class="controls">
+          <button class="control" onclick="move(-1)" aria-label="Previous">‹</button>
+          <button class="control" onclick="randomSpin()" aria-label="Random">✦</button>
+          <button class="control" onclick="move(1)" aria-label="Next">›</button>
+          <button class="control" onclick="toggleAutoSpin()" id="autoBtn" aria-label="Toggle auto-spin">♪</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section" id="about">
+      <h2>Memes meet magic. Ownership fuels the system.</h2>
+      <p>
+        Bepe Love is a 2,222-piece generative NFT collection on Chia. From hypnotized
+        spellcasters to tongue-out degenerates, every Bepe lives somewhere between magic
+        and madness. Rare combinations unlock higher-tier visual identity — orange and
+        love-infused traits represent the most sought-after pieces in the collection.
+      </p>
+      <div class="grid-3">
+        <div class="feature">
+          <b>Built-in revenue split</b>
+          <p>SplitXCH bakes a 25/25/25/25 split into every mint — Tom Bepe, the aWizard
+          community, the developer, and a funding pool. No middlemen. No trust required.</p>
+        </div>
+        <div class="feature">
+          <b>2,222 unique Bepes</b>
+          <p>Seven trait layers: background, face, eyes, mouth, jacket, patch, accessory.
+          Each combination has a deterministic <em>points</em> score that doubles as the
+          card's power in-game.</p>
+        </div>
+        <div class="feature">
+          <b>Tang Gang or Wizard</b>
+          <p>Five rarity tiers — Pleb, Apprentice, Wizard, Tang Mage, Tang Lord — plus
+          five elements (Fire, Water, Nature, Light, Arcane) drawn from the background trait.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCROLL CARD STACK -->
+    <div class="stack-wrap">
+      <h2>The rarest of the rare.</h2>
+      <p style="text-align:center; color:var(--ink); max-width: 640px; margin: 0 auto 32px;">
+        Top six by points. Tang Lords carry the highest stats and the loudest visual identity.
+      </p>
+      <div class="stack" id="stack"></div>
+    </div>
+
+    <!-- COLLECTION DETAILS -->
+    <section class="section" id="collection">
+      <h2>Tang Gang energy, wizard chaos, premium collectible.</h2>
+      <p>
+        The collection is built around layered traits and a deterministic rarity score.
+        Higher-points Bepes carry stronger in-game stats and rarer visual identity. Every
+        piece is yours to hold, trade, or run on the battle table.
+      </p>
+      <div class="grid-3">
+        <div class="feature"><b>Power = Points</b><p>Each Bepe's <em>points</em> are baked into the metadata. That number is the card's base power in the auto-battler.</p></div>
+        <div class="feature"><b>Element matchups</b><p>Background color sets the element. Fire burns Nature, Nature drinks Water, Water douses Fire, Light pierces Arcane, Arcane bends Light.</p></div>
+        <div class="feature"><b>Trait abilities</b><p>Rare single-traits (Foundation Halo, FOMO Flame Patch, Love Vault) trigger abilities — heal, burn, shield, drain.</p></div>
+      </div>
+    </section>
+
+    <!-- GALLERY -->
+    <section class="section" id="gallery">
+      <h2>Gallery — all 2,222.</h2>
+      <p>Click any Bepe to spotlight it in the carousel. Filter by tier or element to find your favorite.</p>
+
+      <div class="gallery-controls" id="galleryFilters">
+        <span class="chip active" data-filter="All">All</span>
+        <span class="chip" data-filter="tier:Tang Lord">Tang Lord</span>
+        <span class="chip" data-filter="tier:Tang Mage">Tang Mage</span>
+        <span class="chip" data-filter="tier:Wizard">Wizard</span>
+        <span class="chip" data-filter="tier:Apprentice">Apprentice</span>
+        <span class="chip" data-filter="tier:Pleb">Pleb</span>
+        <span class="chip" data-filter="el:Fire">🔥 Fire</span>
+        <span class="chip" data-filter="el:Water">💧 Water</span>
+        <span class="chip" data-filter="el:Nature">🌿 Nature</span>
+        <span class="chip" data-filter="el:Light">✨ Light</span>
+        <span class="chip" data-filter="el:Arcane">🔮 Arcane</span>
+      </div>
+
+      <div class="gallery" id="galleryGrid"></div>
+      <div class="gallery-status" id="galleryStatus">Loading…</div>
+      <button class="btn load-more" id="galleryMore">Load More</button>
+    </section>
+
+    <!-- MINT -->
+    <section class="section" id="mint">
+      <h2>Ready to mint.</h2>
+      <p>
+        The Bepe Love mint goes live on Chia with the SplitXCH 25/25/25/25 split baked in.
+        Drop will be announced on the Discord and X. The button below will become the live
+        mint link as soon as the offer file is published.
+      </p>
+      <div class="actions">
+        <a class="btn primary" href="#" onclick="alert('Mint link goes here once published. For now: follow the channels below.'); return false;">Mint (coming soon)</a>
+        <a class="btn" href="#gallery">Browse the Collection</a>
+        <a class="btn ghost" href="play.html">Try the Auto-Battler</a>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>$BEPE $LOVE • 2,222 NFTs on Chia • Powered by SplitXCH</p>
+      <p>
+        <a href="#about">About</a> •
+        <a href="#collection">Collection</a> •
+        <a href="#gallery">Gallery</a> •
+        <a href="play.html">Play</a> •
+        <a href="https://github.com/FlipThisCrypto/-BEPE_-LOVE" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </main>
+
+  <button class="audio-toggle" id="audioToggle" aria-label="Toggle background music">♪</button>
+  <audio id="bgAudio" loop preload="none">
+    <source src="assets/magic-in-the-memes.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script type="module" src="js/landing.js"></script>
+</body>
+</html>

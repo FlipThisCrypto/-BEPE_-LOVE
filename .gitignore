@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node (if we add a build later)
+node_modules/
+
+# Local-only: original art + raw metadata + huge media. The site ships
+# the resized webp variants under images/{thumb,card}/ instead.
+/source-assets/

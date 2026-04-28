@@ -1,0 +1,20 @@
+{
+  "count": 2222,
+  "max_points": 656,
+  "min_points": 222,
+  "avg_points": 378.8,
+  "tier_counts": {
+    "Tang Lord": 22,
+    "Tang Mage": 200,
+    "Wizard": 444,
+    "Apprentice": 834,
+    "Pleb": 722
+  },
+  "element_counts": {
+    "Water": 624,
+    "Light": 477,
+    "Arcane": 695,
+    "Fire": 183,
+    "Nature": 243
+  }
+}
