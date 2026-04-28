@@ -86,8 +86,8 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 - ✅ **Phase 0** — manifest + image pipeline + project structure
 - ✅ **Phase 1** — landing page, hero carousel, filterable gallery, scroll card-stack
 - ✅ **Phase 2** — Bepe Brawl auto-battler (Quick Brawl + Pick Your Hand → 3-round resolution → local leaderboard with W/L/D, streak, recent history)
-- 🔜 **Phase 3** — Chia wallet connect (Goby), play with the cards you actually own, real mint link
-- 🔜 **Phase 4** — Match game (kid-friendly trait-matching, timed scoring; localStorage now, wallet-linked when Phase 3 lands)
+- ✅ **Phase 4** — Bepe Match (kid-friendly trait-matching memory game, three difficulties, timed scoring, completion bonus, miss penalty, best-score / best-time tracking)
+- 🔜 **Phase 3** — Chia wallet connect (Goby), play with the cards you actually own, real mint link, wallet-linked leaderboards for both games
 
 ### Bepe Brawl mechanics
 
@@ -97,6 +97,14 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 - **Trait abilities**: rare accessories and patches add round modifiers (Foundation Halo +20 self, Asters Wand +25 self, Hyper Hex Lasers +30 self, FOMO Flame Patch −15 opp, etc.)
 - **Match**: best of three rounds; AI opponent drafts a hand within ±25% of your average rank for fair-but-unpredictable matchups
 - **Persistence**: all results route through `js/score-store.js` so the localStorage backend can be swapped for wallet-linked storage in one file
+
+### Bepe Match mechanics
+
+- **Mechanic**: classic Memory, but pairs match by *trait value*, not identity. Two cards match if they share the round's announced trait (e.g., both have jacket = "Love Club Jacket"). Different NFTs, same trait — teaches kids the trait vocabulary.
+- **Difficulties**: Easy (6 pairs / background or jacket), Medium (8 pairs / eyes, patch, accessory), Hard (12 pairs / mouth, face, patch).
+- **Trait roulette**: each round randomly picks an eligible trait category from the difficulty pool — replay value.
+- **Scoring**: `Math.max(50, 500 - secondsSinceLastMatch * 25)` per pair, −10 per miss, +50 × pairs completion bonus.
+- **Stats tracked**: rounds played, best score, fastest time, last 6 rounds — same `score-store.js` abstraction as Brawl.
 
 ## Source assets (not committed)
 

@@ -1,0 +1,244 @@
+/* Bepe Match — kid-friendly trait-matching game.
+   Layered on top of base.css and shares some primitives with brawl.css. */
+
+/* ---------- difficulty picker ---------- */
+.difficulty-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 640px;
+  margin: 16px auto 6px;
+}
+
+.diff-card {
+  cursor: pointer;
+  border: 2px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+  padding: 16px 12px 14px;
+  border-radius: 22px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  text-align: center;
+  font: inherit;
+}
+.diff-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 122, 0, 0.6);
+}
+.diff-card.active {
+  border-color: var(--orange);
+  background: linear-gradient(180deg, rgba(255, 122, 0, 0.18), rgba(255, 42, 163, 0.06));
+  box-shadow: 0 0 28px rgba(255, 122, 0, 0.4);
+}
+
+.diff-label { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+.diff-detail { font-size: 14px; color: #ffe1ba; margin-top: 6px; font-weight: 800; }
+.diff-detail-sub { font-size: 12px; color: var(--ink-2); }
+
+.btn.big {
+  font-size: 17px;
+  padding: 16px 22px;
+}
+
+/* ---------- HUD (timer / score / pairs / misses) ---------- */
+.hud {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 540px;
+  margin: 14px auto 0;
+}
+
+.hud-cell {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.025));
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  backdrop-filter: blur(14px);
+}
+
+.hud-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+.hud-value {
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+/* ---------- board ---------- */
+.match-board-shell { padding: 18px; }
+
+.match-board {
+  display: grid;
+  gap: 14px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.match-card {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  perspective: 800px;
+  cursor: pointer;
+}
+
+.mc-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.match-card.flipped .mc-inner { transform: rotateY(180deg); }
+
+.match-card.matched .mc-inner {
+  filter: drop-shadow(0 0 22px rgba(85, 255, 136, 0.55));
+}
+.match-card.matched .mc-front {
+  border-color: rgba(85, 255, 136, 0.8);
+}
+
+.match-card:not(.flipped):hover .mc-inner {
+  transform: rotateY(8deg) translateY(-3px);
+}
+
+.mc-back, .mc-front {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  backface-visibility: hidden;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.mc-back {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 42, 163, 0.4), transparent 55%),
+    linear-gradient(135deg, #1a0512, #06040f 70%);
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  color: rgba(255, 122, 0, 0.85);
+  text-shadow: 0 0 22px rgba(255, 122, 0, 0.7);
+}
+.mc-back .rune { animation: pulse 2.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.12); opacity: 0.7; } }
+
+.mc-front {
+  transform: rotateY(180deg);
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+}
+.mc-front img {
+  width: 100%;
+  flex: 1 1 auto;
+  object-fit: cover;
+  display: block;
+}
+
+.mc-front-meta {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.mc-trait {
+  background: linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.85));
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+.mc-trait .trait-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-weight: 800;
+}
+.mc-trait .trait-value {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- score flash (floating +N / -N) ---------- */
+.score-flash {
+  position: fixed;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  font-size: 64px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  pointer-events: none;
+  animation: scoreFlash 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  text-shadow: 0 4px 30px currentColor;
+}
+.score-flash.good { color: #55ff88; }
+.score-flash.bad  { color: #ff5577; }
+
+@keyframes scoreFlash {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.7); }
+  20%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+  60%  { opacity: 1; transform: translateX(-50%) translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-90px) scale(0.95); }
+}
+
+/* ---------- result badges ---------- */
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 8px auto 18px;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 8px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.badge-pill.best {
+  background: linear-gradient(135deg, var(--gold), var(--orange));
+  color: #16020c;
+  box-shadow: 0 0 24px rgba(255, 208, 106, 0.45);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 800px) {
+  .difficulty-row { grid-template-columns: 1fr; max-width: 360px; }
+  .hud { grid-template-columns: repeat(2, 1fr); max-width: 360px; }
+  .match-board { gap: 10px; }
+}
+
+@media (max-width: 520px) {
+  .mc-trait .trait-value { font-size: 11px; }
+  .mc-back { font-size: 28px; }
+  .score-flash { font-size: 48px; }
+}
