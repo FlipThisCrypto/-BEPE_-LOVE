@@ -367,6 +367,7 @@ function render() {
 async function init() {
   try {
     manifest = await loadManifest();
+    document.addEventListener("wallet:change", () => render());
     setView("home");
   } catch (err) {
     console.error("Match init failed:", err);

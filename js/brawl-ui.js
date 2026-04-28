@@ -4,12 +4,15 @@
 import { loadManifest, tierClass, elementClass, pickRandom } from "./data.js";
 import { runMatch, draftOpponentHand } from "./brawl-engine.js";
 import { recordBrawlMatch, getBrawlStats, getProfile, setProfileName } from "./score-store.js";
+import { getAddressInfo, getCurrentBech32Address } from "./wallet.js";
+import { getOwnedBepeRecords } from "./indexer.js";
 
 let manifest = [];
 let view = "home";              // home | pick | battle | result
 let yourHand = [];
 let lastMatch = null;           // result of latest runMatch
 let pickFilter = "All";
+let ownedIds = null;            // Set<number> of Bepes the connected wallet owns, null if unknown
 
 // ---------- helpers ----------
 function $(sel) { return document.querySelector(sel); }
@@ -175,6 +178,7 @@ function renderPick() {
       </div>
 
       <div class="gallery-controls" id="pickFilters" style="margin-top:18px;">
+        ${getAddressInfo() ? `<span class="chip owned ${pickFilter === "owned" ? "active" : ""}" data-filter="owned">⭐ My Bepes${ownedIds ? ` (${ownedIds.size})` : "…"}</span>` : ""}
         <span class="chip ${pickFilter === "All" ? "active" : ""}" data-filter="All">All</span>
         <span class="chip ${pickFilter === "tier:Tang Lord"  ? "active" : ""}" data-filter="tier:Tang Lord">Tang Lord</span>
         <span class="chip ${pickFilter === "tier:Tang Mage"  ? "active" : ""}" data-filter="tier:Tang Mage">Tang Mage</span>
@@ -187,6 +191,12 @@ function renderPick() {
         <span class="chip ${pickFilter === "el:Light"  ? "active" : ""}" data-filter="el:Light">✨ Light</span>
         <span class="chip ${pickFilter === "el:Arcane" ? "active" : ""}" data-filter="el:Arcane">🔮 Arcane</span>
       </div>
+
+      ${pickFilter === "owned" && filtered.length === 0 ? `
+        <div class="owned-empty">
+          ${ownedIds == null ? "Looking up your Bepes…" : "No Bepe Loves in this wallet yet. Mint or pick from the full collection above."}
+        </div>
+      ` : ""}
 
       <div class="pick-grid" id="pickGrid">
         ${filtered.slice(0, 60).map(nft => {
@@ -210,7 +220,9 @@ function renderPick() {
 
 function filteredPool() {
   let pool = manifest.slice();
-  if (pickFilter.startsWith("tier:")) {
+  if (pickFilter === "owned" && ownedIds) {
+    pool = pool.filter(n => ownedIds.has(n.id));
+  } else if (pickFilter.startsWith("tier:")) {
     const tier = pickFilter.slice(5);
     pool = pool.filter(n => n.tier === tier);
   } else if (pickFilter.startsWith("el:")) {
@@ -219,6 +231,20 @@ function filteredPool() {
   }
   pool.sort((a, b) => a.rank - b.rank);
   return pool;
+}
+
+async function refreshOwned() {
+  const info = getAddressInfo();
+  if (!info) { ownedIds = null; return; }
+  try {
+    const addr = await getCurrentBech32Address();
+    if (!addr) { ownedIds = new Set(); return; }
+    const records = await getOwnedBepeRecords(addr);
+    ownedIds = new Set(records.map(r => r.id));
+  } catch (err) {
+    console.warn("Owned-Bepes lookup failed:", err);
+    ownedIds = new Set();
+  }
 }
 
 function wirePick() {
@@ -468,6 +494,14 @@ function render() {
 async function init() {
   try {
     manifest = await loadManifest();
+    document.addEventListener("wallet:change", async () => {
+      ownedIds = null;
+      // Trigger lookup; re-render whichever view is active when it lands.
+      await refreshOwned();
+      render();
+    });
+    // If a session was restored at boot, kick off the lookup now.
+    if (getAddressInfo()) refreshOwned().then(() => render());
     setView("home");
   } catch (err) {
     console.error("Brawl init failed:", err);

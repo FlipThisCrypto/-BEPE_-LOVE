@@ -1,15 +1,33 @@
 // Score persistence abstraction.
 //
-// v1: localStorage. The backend will be swapped to wallet-linked storage when
-// Chia wallet-connect ships — at which point this is the only file that changes.
-// Game code calls these methods and never touches localStorage directly.
+// v1: localStorage with wallet-namespaced keys. When a Chia wallet is
+// connected (via js/wallet.js), scores write to `bepe.scores.<fingerprint>.v1`
+// so they follow the wallet across devices/browsers. When no wallet is
+// connected, scores write to `bepe.scores.anon.v1`.
+//
+// Phase 3b/3c: a real backend (Chia DataLayer or a small KV server) can swap
+// in here without touching game code — the public API is stable.
 
-const KEY = "bepe.scores.v1";
+const ANON_FINGERPRINT = "anon";
 const PROFILE_KEY = "bepe.profile.v1";
+
+let activeFingerprint = ANON_FINGERPRINT;
+
+export function setActiveWallet(fingerprintOrNull) {
+  activeFingerprint = fingerprintOrNull ? String(fingerprintOrNull) : ANON_FINGERPRINT;
+}
+
+export function getActiveWallet() {
+  return activeFingerprint === ANON_FINGERPRINT ? null : activeFingerprint;
+}
+
+function keyFor(fp = activeFingerprint) {
+  return `bepe.scores.${fp}.v1`;
+}
 
 function readAll() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor());
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -17,10 +35,21 @@ function readAll() {
 }
 
 function writeAll(data) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(keyFor(), JSON.stringify(data));
+}
+
+function migrateLegacyIfNeeded() {
+  // Pre-Phase-3 builds wrote to `bepe.scores.v1`. If the active namespace is
+  // anon and no record exists there yet, copy the legacy data over so users
+  // don't lose their stats. Run once.
+  if (activeFingerprint !== ANON_FINGERPRINT) return;
+  if (localStorage.getItem(keyFor()) != null) return;
+  const legacy = localStorage.getItem("bepe.scores.v1");
+  if (legacy) localStorage.setItem(keyFor(), legacy);
 }
 
 function ensure() {
+  migrateLegacyIfNeeded();
   let s = readAll();
   if (!s) {
     s = {

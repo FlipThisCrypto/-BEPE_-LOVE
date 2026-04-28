@@ -230,6 +230,13 @@ async function init() {
     manifest = m;
     renderStats(s);
 
+    // The wallet button is owned by wallet-ui.js — landing just listens so
+    // future per-wallet hero pieces (e.g., "your collection: N Bepes") have
+    // a hook to plug into.
+    document.addEventListener("wallet:change", (e) => {
+      // No-op for now; reserved.
+    });
+
     // Featured = top 9 rarest for hero
     featured = topByPoints(manifest, FEATURED_COUNT);
     buildCarousel();

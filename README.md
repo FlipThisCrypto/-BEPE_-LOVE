@@ -87,7 +87,15 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 - ✅ **Phase 1** — landing page, hero carousel, filterable gallery, scroll card-stack
 - ✅ **Phase 2** — Bepe Brawl auto-battler (Quick Brawl + Pick Your Hand → 3-round resolution → local leaderboard with W/L/D, streak, recent history)
 - ✅ **Phase 4** — Bepe Match (kid-friendly trait-matching memory game, three difficulties, timed scoring, completion bonus, miss penalty, best-score / best-time tracking)
-- 🔜 **Phase 3** — Chia wallet connect (Goby), play with the cards you actually own, real mint link, wallet-linked leaderboards for both games
+- ✅ **Phase 3a** — Chia WalletConnect login. QR pairing modal, session restore, wallet-namespaced score storage (per-fingerprint). MintGarden indexer lookup powers a "⭐ My Bepes" filter on the Brawl picker so you can play with the Bepes you actually own.
+- 🔜 **Phase 3b** — Random Mint button (secure-the-mint dispenser): waiting on creator-side CLI run to generate the 2,222 offer files. Mint price set at **2 XCH** per random Bepe.
+
+### Wallet Connect
+
+- Plain ES modules, no build step. `@walletconnect/sign-client@2.13.0` and `qrcode@1.5.4` loaded via `https://esm.sh`.
+- Project ID: `04650e37bf0643ffe10266d3d9e413b8` (client-visible by design — WalletConnect Cloud rate-limits per origin).
+- Required RPC: `chia_logIn`. Optional: `chia_getCurrentAddress`, `chia_getNextAddress`, `chia_getWallets`, `chia_getWalletBalance`, `chia_takeOffer`, `chia_signMessageByAddress`. The `chia_takeOffer` request is staged for Phase 3b's mint flow but listed under optional namespaces so wallets without it still pair cleanly.
+- Score storage namespaces by wallet fingerprint. When connected, all writes go to `bepe.scores.<fingerprint>.v1`; when disconnected, to `bepe.scores.anon.v1`. Legacy `bepe.scores.v1` is auto-migrated on first load.
 
 ### Bepe Brawl mechanics
 

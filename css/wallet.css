@@ -1,0 +1,171 @@
+/* Wallet connect — button in header + QR modal overlay. */
+
+/* ---------- header button ---------- */
+.wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.wallet-btn:hover:not([disabled]) {
+  color: white;
+  border-color: rgba(255, 122, 0, 0.7);
+  background: rgba(255, 122, 0, 0.08);
+}
+
+.wallet-btn[disabled] { opacity: 0.6; cursor: wait; }
+
+.wallet-btn.connected {
+  border-color: rgba(85, 255, 136, 0.55);
+  background: rgba(85, 255, 136, 0.08);
+  color: white;
+}
+
+.wb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-2);
+}
+
+.wb-dot.live {
+  background: #55ff88;
+  box-shadow: 0 0 10px rgba(85, 255, 136, 0.7);
+}
+
+.wb-label { font-variant-numeric: tabular-nums; }
+.wb-caret { font-size: 10px; opacity: 0.7; margin-left: -2px; }
+
+/* ---------- QR modal overlay ---------- */
+.wc-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  animation: wcFade 0.18s ease;
+}
+
+@keyframes wcFade { from { opacity: 0; } to { opacity: 1; } }
+
+.wc-modal-shell {
+  position: relative;
+  background: linear-gradient(180deg, #14091f, #07050d);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 28px 26px 22px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.7), 0 0 80px rgba(255, 122, 0, 0.18);
+  text-align: center;
+  color: white;
+}
+
+.wc-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  line-height: 1;
+}
+.wc-modal-close:hover { border-color: var(--orange); }
+
+.wc-modal-title {
+  font-size: 22px;
+  margin: 4px 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.wc-modal-sub {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.wc-qr {
+  width: 280px;
+  height: 280px;
+  margin: 4px auto 14px;
+  border-radius: 16px;
+  background: white;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.wc-qr img { width: 100%; height: 100%; }
+
+.wc-uri-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+.wc-uri-row input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  outline: none;
+}
+.wc-uri-row input:focus { border-color: var(--orange); }
+.wc-uri-row .btn { padding: 9px 14px; font-size: 13px; }
+
+.wc-modal-hint {
+  font-size: 12px;
+  color: var(--ink-2);
+  margin: 14px 0 0;
+}
+.wc-modal-hint a { color: #ffd08a; font-weight: 800; }
+
+@media (max-width: 460px) {
+  .wc-qr { width: 240px; height: 240px; }
+  .wc-modal-shell { padding: 22px 18px 18px; }
+}
+
+/* ---------- "Play with my Bepes" filter chip when connected ---------- */
+.chip.owned {
+  background: linear-gradient(135deg, #55ff88, #00eaff);
+  color: #04050a;
+  border-color: transparent;
+  font-weight: 900;
+}
+.chip.owned:hover { transform: translateY(-2px); }
+
+.owned-empty {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: center;
+}
