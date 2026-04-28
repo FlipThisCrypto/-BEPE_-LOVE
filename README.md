@@ -85,8 +85,18 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 
 - ✅ **Phase 0** — manifest + image pipeline + project structure
 - ✅ **Phase 1** — landing page, hero carousel, filterable gallery, scroll card-stack
-- 🚧 **Phase 2** — Bepe Brawl auto-battler (draft 3 cards → 3-round resolution → leaderboard)
+- ✅ **Phase 2** — Bepe Brawl auto-battler (Quick Brawl + Pick Your Hand → 3-round resolution → local leaderboard with W/L/D, streak, recent history)
 - 🔜 **Phase 3** — Chia wallet connect (Goby), play with the cards you actually own, real mint link
+- 🔜 **Phase 4** — Match game (kid-friendly trait-matching, timed scoring; localStorage now, wallet-linked when Phase 3 lands)
+
+### Bepe Brawl mechanics
+
+- **Power**: each Bepe's `points` from metadata is the base score
+- **Element wheel**: Fire > Nature > Water > Fire (cycle); Light ↔ Arcane (clash); same element = mirror
+- **Element bonus**: +50 advantage / +30 clash / +5 mirror
+- **Trait abilities**: rare accessories and patches add round modifiers (Foundation Halo +20 self, Asters Wand +25 self, Hyper Hex Lasers +30 self, FOMO Flame Patch −15 opp, etc.)
+- **Match**: best of three rounds; AI opponent drafts a hand within ±25% of your average rank for fair-but-unpredictable matchups
+- **Persistence**: all results route through `js/score-store.js` so the localStorage backend can be swapped for wallet-linked storage in one file
 
 ## Source assets (not committed)
 

@@ -4,79 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bepe Brawl — Auto-Battler · Bepe Love</title>
-  <meta name="description" content="Bepe Brawl: a card-based auto-battler powered by all 2,222 Bepe Love NFTs. Stack a hand, run the round, climb the leaderboard." />
+  <meta name="description" content="Bepe Brawl: a card-based auto-battler powered by all 2,222 Bepe Love NFTs. Pick three Bepes, run the rounds, climb the leaderboard." />
+  <meta name="theme-color" content="#06040f" />
+
+  <link rel="preconnect" href="https://rsms.me/" crossorigin />
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
   <link rel="stylesheet" href="css/base.css" />
-  <style>
-    .play-hero {
-      width: min(1180px, calc(100% - 32px));
-      margin: 24px auto 40px;
-      text-align: center;
-    }
-    .play-hero h1 { font-size: clamp(48px, 8vw, 96px); margin: 12px 0; letter-spacing: -0.06em; }
-    .play-hero .lead { max-width: 720px; margin: 0 auto 28px; }
-
-    .preview-deck {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 16px;
-      width: min(1180px, calc(100% - 32px));
-      margin: 0 auto 60px;
-    }
-
-    .game-card {
-      position: relative;
-      border-radius: 22px;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.35);
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-      aspect-ratio: 3 / 4;
-      transition: transform 0.25s ease;
-    }
-
-    .game-card:hover { transform: translateY(-6px); }
-
-    .game-card img { width: 100%; height: 70%; object-fit: cover; display: block; }
-
-    .game-card .strip {
-      position: absolute; top: 8px; left: 8px; right: 8px;
-      display: flex; justify-content: space-between; align-items: center; gap: 6px;
-    }
-
-    .game-card .body {
-      position: absolute;
-      inset: 70% 0 0 0;
-      padding: 8px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.7) 30%);
-    }
-
-    .game-card .body .name {
-      font-weight: 900; font-size: 13px; letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .game-card .body .row {
-      display: flex; justify-content: space-between; align-items: center; gap: 6px;
-    }
-
-    .placeholder-panel {
-      width: min(1180px, calc(100% - 32px));
-      margin: 0 auto 60px;
-      padding: 36px;
-      border: 1px dashed var(--line);
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 28px;
-      text-align: center;
-    }
-
-    @media (max-width: 1100px) { .preview-deck { grid-template-columns: repeat(4, 1fr); } }
-    @media (max-width: 800px)  { .preview-deck { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 520px)  { .preview-deck { grid-template-columns: repeat(2, 1fr); } }
-  </style>
+  <link rel="stylesheet" href="css/brawl.css" />
 </head>
 <body>
   <main class="page">
@@ -94,41 +28,16 @@
       </nav>
     </header>
 
-    <section class="play-hero">
-      <div class="eyebrow">Auto-Battler · Coming Soon</div>
-      <h1><span class="gradient">Bepe Brawl</span></h1>
-      <p class="lead">
-        Pick three Bepes. Three rounds. Power vs. power, with elemental matchups
-        and trait abilities firing in real time. Anyone can play — no wallet required.
-        Win streaks climb the leaderboard.
-      </p>
-      <div class="actions" style="justify-content:center;">
-        <a class="btn primary" href="index.html#gallery">Browse the Deck</a>
-        <a class="btn" href="index.html#about">How It Works</a>
-      </div>
-    </section>
-
-    <section class="placeholder-panel">
-      <h2 style="margin:0 0 10px;">Sample Hand</h2>
-      <p style="color:var(--ink); margin: 0 0 8px;">
-        Here's what your hand will look like in-game. Each card pulls power, tier,
-        and element directly from the on-chain metadata.
-      </p>
-    </section>
-
-    <div class="preview-deck" id="previewDeck"></div>
-
-    <section class="section">
-      <h2>How a brawl plays out</h2>
-      <div class="grid-3">
-        <div class="feature"><b>1. Draft</b><p>Pick three Bepes from the collection (or let the system roll a random hand for you).</p></div>
-        <div class="feature"><b>2. Resolve</b><p>Each round: power + element bonus + ability triggers. Best of three takes the match.</p></div>
-        <div class="feature"><b>3. Climb</b><p>Wins persist locally; later, connect a Chia wallet to play with the cards you actually own.</p></div>
-      </div>
-    </section>
+    <div id="playRoot">
+      <!-- Brawl UI mounts here -->
+      <section class="play-hero">
+        <h1><span class="gradient">Bepe Brawl</span></h1>
+        <p class="lead">Loading the deck…</p>
+      </section>
+    </div>
 
     <footer class="footer">
-      <p>$BEPE $LOVE • Bepe Brawl is in active development</p>
+      <p>$BEPE $LOVE • Bepe Brawl v1 — local leaderboard, wallet-linked coming with Chia connect</p>
       <p>
         <a href="index.html">Home</a> •
         <a href="index.html#gallery">Gallery</a> •
@@ -137,35 +46,6 @@
     </footer>
   </main>
 
-  <script type="module">
-    import { loadManifest, tierClass, elementClass, pickRandom } from "./js/data.js";
-    (async () => {
-      try {
-        const m = await loadManifest();
-        // Show a sample hand: 1 Tang Lord + 1 Tang Mage + 1 Wizard + 1 Apprentice + 1 Pleb
-        const tiers = ["Tang Lord", "Tang Mage", "Wizard", "Apprentice", "Pleb"];
-        const hand = tiers.map(t => pickRandom(m.filter(n => n.tier === t), 1)[0]).filter(Boolean);
-        const root = document.getElementById("previewDeck");
-        root.innerHTML = hand.map(nft => `
-          <div class="game-card">
-            <img src="${nft.card}" alt="${nft.name}" loading="lazy" />
-            <div class="strip">
-              <span class="tier ${tierClass(nft.tier)}">${nft.tier}</span>
-              <span class="element ${elementClass(nft.element)}">${nft.element}</span>
-            </div>
-            <div class="body">
-              <div class="name">${nft.name}</div>
-              <div class="row">
-                <span style="color:var(--ink-2); font-size:11px;">Rank #${nft.rank}</span>
-                <span class="points-badge">${nft.points} PTS</span>
-              </div>
-            </div>
-          </div>
-        `).join("");
-      } catch (err) {
-        console.error(err);
-      }
-    })();
-  </script>
+  <script type="module" src="js/brawl-ui.js"></script>
 </body>
 </html>
