@@ -26,6 +26,7 @@ export default async (req) => {
 
   const fp = typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null;
   const queue = getStore("bepe-mint-queue");
+  const offers = getStore("bepe-mint-offers");
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let current;
@@ -51,6 +52,14 @@ export default async (req) => {
 
     try {
       await queue.setJSON(CONFIRMED_KEY, next, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
+
+      // Best-effort cleanup: delete the offer blob now that it's been minted.
+      // The queue counter is already past this token so it can't be re-dispensed
+      // either way — this is just storage tidying. Failure here doesn't fail
+      // the confirm response.
+      const offerKey = `offer/${String(tokenNum).padStart(4, "0")}`;
+      offers.delete(offerKey).catch(err => console.warn(`offer cleanup failed for ${offerKey}:`, err));
+
       return json({ ok: true, alreadyConfirmed: false, totalConfirmed: next.tokens.length });
     } catch (err) {
       // Conflict — retry with fresh read.
