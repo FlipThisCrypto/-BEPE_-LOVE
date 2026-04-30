@@ -88,36 +88,40 @@ first deploy that exposes the mint, you need to upload the `.offer` files
 and initialize the queue. This runs locally — never check the offers into
 the repo (it's public; committing them defeats the random dispenser).
 
+The bootstrap script POSTs offers to a server-side admin function
+(`/api/admin/bootstrap`) which writes to Blobs from inside Netlify's runtime.
+This sidesteps Netlify Personal Access Token Blobs-write scope issues — auth
+inside the function runtime always works.
+
 ### Prereqs
 
 - Node 18+ installed
 - The 2,220 `.offer` files in a directory (default: `../offers/` relative to `site/`)
-- A **Personal Access Token** (starts with `nfp_…`): https://app.netlify.com/user/applications → **New access token**
-- Your **Site ID** (a UUID like `12345678-1234-…`): Netlify dashboard → your site → **Site configuration** → **Site information** → **Site ID**
+- The latest commit must already be deployed to Netlify (so the admin function exists)
+- A shared secret you set in **Netlify dashboard → your site → Site configuration → Environment variables → Add variable**:
+  - **Key**: `MINT_BOOTSTRAP_SECRET`
+  - **Value**: any long random string (32+ chars, e.g. paste from a password manager)
+  - **Scope**: All scopes
+- After adding, **trigger a redeploy** (env var changes don't auto-redeploy). Netlify dashboard → **Deploys** → **Trigger deploy** → **Deploy site**.
 
-> Don't confuse the two — both are 60+ characters of random text. The token starts with `nfp_`, the site ID looks like a UUID.
+### Run
 
-### Run (any platform — pass flags inline)
-
-```bash
-cd site
-npm install
-node scripts/upload_offers.mjs --offers ../offers --token nfp_... --site-id 12345678-1234-1234-1234-123456789abc
-```
-
-### Or via env vars
-
-**PowerShell:**
 ```powershell
-$env:NETLIFY_AUTH_TOKEN = "nfp_..."
-$env:NETLIFY_SITE_ID    = "12345678-1234-..."
-node scripts/upload_offers.mjs --offers ../offers
+cd site
+node scripts/upload_offers.mjs `
+  --offers ../offers `
+  --site-url https://bepelove.netlify.app `
+  --secret <the-same-secret-you-set-in-netlify>
 ```
 
-**bash / zsh:**
+(The PowerShell backticks above are line continuations; one-liner works too.)
+
+bash / zsh equivalent:
 ```bash
-NETLIFY_AUTH_TOKEN=nfp_... NETLIFY_SITE_ID=12345678-... \
-  node scripts/upload_offers.mjs --offers ../offers
+node scripts/upload_offers.mjs \
+  --offers ../offers \
+  --site-url https://bepelove.netlify.app \
+  --secret <the-same-secret>
 ```
 
 The script:
@@ -138,6 +142,20 @@ the landing page, connect a Chia wallet, click **Mint a Random Bepe**.
 
 - `POST /api/mint/random` — pops next offer, returns `{ tokenNumber, offerText, remaining }`
 - `GET  /api/mint/status` — read-only stats, returns `{ initialized, total, dispensed, remaining, recent }`
+- `POST /api/admin/bootstrap` — admin operations (upload-batch / init-queue / status / wipe), gated by `MINT_BOOTSTRAP_SECRET` env var. Used by `scripts/upload_offers.mjs`.
+
+### Re-bootstrap if needed
+
+Already-bootstrapped queue won't be touched on re-run. To wipe the queue and start over:
+
+```powershell
+node scripts/upload_offers.mjs --status --site-url https://bepelove.netlify.app --secret <secret>
+# Or to reset:
+curl -X POST https://bepelove.netlify.app/api/admin/bootstrap `
+  -H "content-type: application/json" `
+  -d '{\"secret\":\"<secret>\",\"action\":\"wipe\"}'
+# then re-run with --force
+```
 
 ## Roadmap
 
