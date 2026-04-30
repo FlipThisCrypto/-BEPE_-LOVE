@@ -67,27 +67,32 @@ export function getAddressInfo() {
   };
 }
 
-export async function getCurrentBech32Address(walletId = 1) {
-  if (!session) return null;
+// Generic RPC helper. Throws on error so callers can handle/display per-call.
+export async function requestRpc(method, params = {}) {
+  if (!session) throw new Error("No active wallet session");
   const c = await getClient();
   const info = getAddressInfo();
-  if (!info) return null;
+  if (!info) throw new Error("No connected wallet");
+  return c.request({
+    topic: session.topic,
+    chainId: info.chain,
+    request: {
+      method,
+      params: { fingerprint: Number(info.fingerprint), ...params },
+    },
+  });
+}
+
+export async function getCurrentBech32Address(walletId = 1) {
+  if (!session) return null;
   try {
-    const result = await c.request({
-      topic: session.topic,
-      chainId: info.chain,
-      request: {
-        method: "chia_getCurrentAddress",
-        params: { fingerprint: Number(info.fingerprint), walletId },
-      },
-    });
-    // Different wallets return slightly different shapes — normalize.
+    const result = await requestRpc("chia_getCurrentAddress", { walletId });
     if (typeof result === "string") return result;
     return result?.address ?? result?.data ?? null;
   } catch (err) {
-    // Many wallets only approve chia_logIn at pairing time and reject optional
-    // methods. Soft-fail: callers handle a null bech32 address gracefully
-    // (the audit log just records fingerprint without xch1...).
+    // Wallets that don't approve this at pairing reject locally before any
+    // wire request. Soft-fail: caller handles null bech32 (audit log records
+    // fingerprint only).
     const msg = String(err?.message || err);
     if (!/Missing or invalid|not approved|disapproved/i.test(msg)) {
       console.warn("getCurrentAddress failed:", err);
@@ -101,7 +106,13 @@ export async function connect() {
   const { uri, approval } = await c.connect({
     requiredNamespaces: {
       chia: {
-        methods: ["chia_logIn"],
+        methods: [
+          // Login + read
+          "chia_logIn",
+          "chia_getCurrentAddress",
+          // Mint flow
+          "chia_takeOffer",
+        ],
         chains: [DEFAULT_CHAIN],
         events: [],
       },
@@ -109,11 +120,9 @@ export async function connect() {
     optionalNamespaces: {
       chia: {
         methods: [
-          "chia_getCurrentAddress",
           "chia_getNextAddress",
           "chia_getWallets",
           "chia_getWalletBalance",
-          "chia_takeOffer",
           "chia_signMessageByAddress",
         ],
         chains: [DEFAULT_CHAIN],
