@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/wallet.css" />
+  <link rel="stylesheet" href="css/mint.css" />
 </head>
 <body>
   <main class="page">
@@ -69,6 +70,35 @@
           <button class="control" onclick="toggleAutoSpin()" id="autoBtn" aria-label="Toggle auto-spin">♪</button>
         </div>
       </div>
+    </section>
+
+    <!-- RANDOM MINT -->
+    <section class="mint-section" id="mint">
+      <h2>Mint a Random Bepe — <span class="gradient">2 XCH</span></h2>
+      <p class="lead">
+        Every Bepe is a 1-of-1. Click the button, the dispenser pulls one at random
+        from the unminted pool, and your wallet completes the take. No picking, no
+        gaming the rares — fully on-chain randomness via secure-the-mint offer files.
+      </p>
+
+      <div class="mint-stats">
+        <div class="stat"><strong id="mintRemaining">…</strong><span>Bepes Remaining</span></div>
+        <div class="stat"><strong id="mintDispensed">…</strong><span>Already Minted</span></div>
+        <div class="stat"><strong id="mintTotal">…</strong><span>Total Supply</span></div>
+      </div>
+
+      <div class="mint-actions">
+        <button id="mintBtn" type="button">⚡ Mint a Random Bepe (2 XCH)</button>
+        <span id="mintStatus" class="mint-status"></span>
+      </div>
+
+      <div class="mint-fineprint">
+        <span>Powered by secure-the-mint on Chia</span>
+        <span>SplitXCH 25/25/25/25 baked into every offer</span>
+        <span>Wallet-required — pairs via WalletConnect</span>
+      </div>
+
+      <div id="mintResult" style="display:none;"></div>
     </section>
 
     <!-- ABOUT -->
@@ -148,21 +178,6 @@
       <button class="btn load-more" id="galleryMore">Load More</button>
     </section>
 
-    <!-- MINT -->
-    <section class="section" id="mint">
-      <h2>Ready to mint.</h2>
-      <p>
-        The Bepe Love mint goes live on Chia with the SplitXCH 25/25/25/25 split baked in.
-        Drop will be announced on the Discord and X. The button below will become the live
-        mint link as soon as the offer file is published.
-      </p>
-      <div class="actions">
-        <a class="btn primary" href="#" onclick="alert('Mint link goes here once published. For now: follow the channels below.'); return false;">Mint (coming soon)</a>
-        <a class="btn" href="#gallery">Browse the Collection</a>
-        <a class="btn ghost" href="play.html">Try the Auto-Battler</a>
-      </div>
-    </section>
-
     <footer class="footer">
       <p>$BEPE $LOVE • 2,222 NFTs on Chia • Powered by SplitXCH</p>
       <p>
@@ -182,5 +197,6 @@
 
   <script type="module" src="js/wallet-ui.js"></script>
   <script type="module" src="js/landing.js"></script>
+  <script type="module" src="js/mint.js"></script>
 </body>
 </html>

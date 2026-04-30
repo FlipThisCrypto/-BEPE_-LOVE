@@ -79,7 +79,50 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 1. Push this repo to GitHub.
 2. In Netlify: **Add new site → Import an existing project → GitHub → -BEPE_-LOVE**.
 3. Build command: leave blank. Publish directory: `.` (or wherever `index.html` lives).
-4. `netlify.toml` already configures cache headers for `images/`, `data/`, `css/`, `js/`.
+4. `netlify.toml` already configures cache headers, the functions directory, and pretty-URL redirects.
+
+## Mint dispenser bootstrap (one-time)
+
+The Random Mint button serves offer files from Netlify Blobs. Before the
+first deploy that exposes the mint, you need to upload the `.offer` files
+and initialize the queue. This runs locally — never check the offers into
+the repo (it's public; committing them defeats the random dispenser).
+
+### Prereqs
+
+- Node 18+ installed
+- The 2,220 `.offer` files in a directory (default: `../offers/` relative to `site/`)
+- A Netlify personal access token: https://app.netlify.com/user/applications → New access token
+- Your Netlify site ID: dashboard → Site settings → Site information → Site ID
+
+### Run
+
+```bash
+cd site
+npm install
+
+NETLIFY_AUTH_TOKEN=<your-token> NETLIFY_SITE_ID=<your-site-id> \
+  node scripts/upload_offers.mjs --offers ../offers
+```
+
+The script:
+1. Reads every `bepe_love_NNNN.offer` from the directory.
+2. Uploads each to a Blobs store (`bepe-mint-offers`, key `offer/<NNNN>`).
+3. Builds a randomly-shuffled queue and writes it to `bepe-mint-queue` / `queue`.
+
+It's safe to re-run for individual offer uploads (overwrite is idempotent).
+**The queue is only initialized once** to avoid resetting a live mint —
+pass `--force-queue` to override.
+
+### After bootstrap
+
+`/api/mint/random` is live as soon as Netlify deploys the function. Visit
+the landing page, connect a Chia wallet, click **Mint a Random Bepe**.
+
+### Endpoints
+
+- `POST /api/mint/random` — pops next offer, returns `{ tokenNumber, offerText, remaining }`
+- `GET  /api/mint/status` — read-only stats, returns `{ initialized, total, dispensed, remaining, recent }`
 
 ## Roadmap
 
@@ -88,7 +131,7 @@ The build scripts are idempotent — `build_images.py` skips files that already 
 - ✅ **Phase 2** — Bepe Brawl auto-battler (Quick Brawl + Pick Your Hand → 3-round resolution → local leaderboard with W/L/D, streak, recent history)
 - ✅ **Phase 4** — Bepe Match (kid-friendly trait-matching memory game, three difficulties, timed scoring, completion bonus, miss penalty, best-score / best-time tracking)
 - ✅ **Phase 3a** — Chia WalletConnect login. QR pairing modal, session restore, wallet-namespaced score storage (per-fingerprint). MintGarden indexer lookup powers a "⭐ My Bepes" filter on the Brawl picker so you can play with the Bepes you actually own.
-- 🔜 **Phase 3b** — Random Mint button (secure-the-mint dispenser): waiting on creator-side CLI run to generate the 2,222 offer files. Mint price set at **2 XCH** per random Bepe.
+- ✅ **Phase 3b** — Random Mint dispenser. Netlify Function backed by Netlify Blobs serves a shuffled queue of 2,220 secure-the-mint offer files (the user's two test mints — #0001 and #0085 — are already excluded). Mint button on landing page tries `chia_takeOffer` via WalletConnect first, falls back to a downloaded `.offer` file with step-by-step instructions. **2 XCH** per Bepe, SplitXCH 25/25/25/25 baked into every offer.
 
 ### Wallet Connect
 

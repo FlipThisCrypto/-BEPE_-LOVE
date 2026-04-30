@@ -2,6 +2,10 @@
   publish = "."
   command = ""
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Cache the heavy stuff aggressively (images + JSON manifest are immutable per release)
 [[headers]]
   for = "/images/*"

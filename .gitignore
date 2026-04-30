@@ -14,3 +14,13 @@ node_modules/
 # Local-only: original art + raw metadata + huge media. The site ships
 # the resized webp variants under images/{thumb,card}/ instead.
 /source-assets/
+
+# Offer files MUST stay out of the repo. The repo is public; committing
+# offers would let anyone enumerate the rare Tang Lords and bypass the
+# random dispenser. They live in Netlify Blobs, uploaded once via
+# scripts/upload_offers.mjs.
+/offers/
+
+# Local Netlify state
+.netlify/
+node_modules/
