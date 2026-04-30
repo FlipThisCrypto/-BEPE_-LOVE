@@ -92,16 +92,31 @@ the repo (it's public; committing them defeats the random dispenser).
 
 - Node 18+ installed
 - The 2,220 `.offer` files in a directory (default: `../offers/` relative to `site/`)
-- A Netlify personal access token: https://app.netlify.com/user/applications → New access token
-- Your Netlify site ID: dashboard → Site settings → Site information → Site ID
+- A **Personal Access Token** (starts with `nfp_…`): https://app.netlify.com/user/applications → **New access token**
+- Your **Site ID** (a UUID like `12345678-1234-…`): Netlify dashboard → your site → **Site configuration** → **Site information** → **Site ID**
 
-### Run
+> Don't confuse the two — both are 60+ characters of random text. The token starts with `nfp_`, the site ID looks like a UUID.
+
+### Run (any platform — pass flags inline)
 
 ```bash
 cd site
 npm install
+node scripts/upload_offers.mjs --offers ../offers --token nfp_... --site-id 12345678-1234-1234-1234-123456789abc
+```
 
-NETLIFY_AUTH_TOKEN=<your-token> NETLIFY_SITE_ID=<your-site-id> \
+### Or via env vars
+
+**PowerShell:**
+```powershell
+$env:NETLIFY_AUTH_TOKEN = "nfp_..."
+$env:NETLIFY_SITE_ID    = "12345678-1234-..."
+node scripts/upload_offers.mjs --offers ../offers
+```
+
+**bash / zsh:**
+```bash
+NETLIFY_AUTH_TOKEN=nfp_... NETLIFY_SITE_ID=12345678-... \
   node scripts/upload_offers.mjs --offers ../offers
 ```
 

@@ -4,11 +4,14 @@
 //
 // Prereqs:
 //   1. cd site && npm install
-//   2. Get a Netlify personal access token: https://app.netlify.com/user/applications
-//   3. Find your site ID: in Netlify dashboard, Site settings -> Site information
-//   4. Run:
-//        NETLIFY_AUTH_TOKEN=<token> NETLIFY_SITE_ID=<site-id> \
-//          node scripts/upload_offers.mjs --offers ../offers
+//   2. Get a Netlify personal access token (starts with `nfp_`):
+//        https://app.netlify.com/user/applications -> New access token
+//   3. Find your site ID (a UUID like 12345678-1234-1234-...):
+//        Netlify dashboard -> your site -> Site configuration -> Site information -> Site ID
+//   4. Run (any platform):
+//        node scripts/upload_offers.mjs --offers ../offers --token nfp_... --site-id <uuid>
+//
+//      Or set env vars NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID and omit the flags.
 //
 // What it does:
 //   - Reads every bepe_love_NNNN.offer in the --offers directory
@@ -30,16 +33,28 @@ const OFFERS_DIR = args["--offers"] || "../offers";
 const FORCE_QUEUE = !!args["--force-queue"];
 const DRY_RUN = !!args["--dry-run"];
 
-if (!process.env.NETLIFY_AUTH_TOKEN || !process.env.NETLIFY_SITE_ID) {
-  console.error("Missing env vars. Set NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID.");
-  console.error("Get a token at: https://app.netlify.com/user/applications");
-  console.error("Find site ID under: Netlify dashboard -> Site settings -> Site information");
+const token = args["--token"] || process.env.NETLIFY_AUTH_TOKEN;
+const siteID = args["--site-id"] || args["--siteId"] || process.env.NETLIFY_SITE_ID;
+
+if (!token || !siteID) {
+  console.error("Missing credentials.");
+  console.error("Pass --token <nfp_...> and --site-id <uuid>, or set NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID env vars.");
+  console.error("");
+  console.error("Token (starts with `nfp_`): https://app.netlify.com/user/applications -> New access token");
+  console.error("Site ID (a UUID): Netlify dashboard -> your site -> Site configuration -> Site information -> Site ID");
   process.exit(1);
 }
 
+if (!/^nfp_/.test(token)) {
+  console.warn("Warning: token doesn't start with 'nfp_' — make sure you used the Personal Access Token, not the Site ID.");
+}
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(siteID)) {
+  console.warn("Warning: site ID doesn't look like a UUID — make sure you used the Site ID, not the Personal Access Token.");
+}
+
 const blobOpts = {
-  siteID: process.env.NETLIFY_SITE_ID,
-  token: process.env.NETLIFY_AUTH_TOKEN,
+  siteID,
+  token,
 };
 
 // ----- read offer files -----
