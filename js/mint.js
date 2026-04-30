@@ -9,6 +9,7 @@ import { getAddressInfo, getCurrentBech32Address, connect, requestRpc } from "./
 
 const MINT_API = "/api/mint/random";
 const STATUS_API = "/api/mint/status";
+const CONFIRM_API = "/api/mint/confirm";
 
 let manifest = [];
 
@@ -92,6 +93,16 @@ async function onMintClick() {
   }
 
   if (takeResult.ok) {
+    // Tell the server this mint actually went through so the public counter
+    // reflects reality. Best-effort — failures here don't block the user.
+    fetch(CONFIRM_API, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tokenNumber: offerData.tokenNumber,
+        walletFingerprint: info.fingerprint,
+      }),
+    }).catch(err => console.warn("mint-confirm POST failed:", err));
     showResult({ kind: "success", tokenNumber: offerData.tokenNumber });
   } else {
     showResult({

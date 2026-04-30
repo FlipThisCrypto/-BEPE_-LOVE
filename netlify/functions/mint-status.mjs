@@ -1,20 +1,37 @@
-// Read-only status of the mint dispenser.
+// Read-only status of the mint dispenser + confirmed mints.
+//
+// Total = the full collection size (hardcoded).
+// Minted = confirmed-set count + tokens that were minted before the dispenser
+//          existed (your test mints of #0001 and #0085).
+// Remaining = total - minted.
+//
+// This is the source of truth for the user-facing counter. The dispenser's
+// internal queue counter is a separate concern and exposed under `queue.*`
+// for diagnostics only.
 //
 // Endpoint: GET /api/mint/status
-// Returns: { initialized: boolean, total: number, dispensed: number, remaining: number, recent: [{ tokenNumber, ts }, ...] }
 
 import { getStore } from "@netlify/blobs";
+
+const COLLECTION_TOTAL = 2222;
+// Tokens minted before the dispenser was bootstrapped — counted as minted.
+const PRE_MINTED = [1, 85];
 
 export default async () => {
   const queue = getStore("bepe-mint-queue");
   const offers = getStore("bepe-mint-offers");
 
-  const q = await queue.get("queue", { type: "json" });
-  if (!q) {
-    return json({ initialized: false, total: 0, dispensed: 0, remaining: 0, offerCount: 0, recent: [] });
-  }
+  const [confirmedRaw, q, log] = await Promise.all([
+    queue.get("confirmed-set", { type: "json" }),
+    queue.get("queue", { type: "json" }),
+    queue.get("dispensed", { type: "json" }),
+  ]);
 
-  // Count blobs in the offers store. list() paginates; count all pages.
+  const confirmed = confirmedRaw?.tokens ?? [];
+  const minted = confirmed.length + PRE_MINTED.length;
+  const remaining = Math.max(0, COLLECTION_TOTAL - minted);
+
+  // Diagnostic: count blobs in the offers store. Best-effort.
   let offerCount = 0;
   try {
     let cursor = undefined;
@@ -23,23 +40,35 @@ export default async () => {
       offerCount += page.blobs.length;
       cursor = page.cursor;
     } while (cursor);
-  } catch (_) { /* best-effort */ }
+  } catch (_) {}
 
-  const log = (await queue.get("dispensed", { type: "json" })) || { items: [] };
-  const recent = (log.items || []).slice(-10).reverse().map(it => ({
-    tokenNumber: it.tokenNumber,
-    ts: it.ts,
+  // Recent confirmed mints (last 10) for an activity ticker.
+  const recentEntries = (confirmedRaw?.entries ?? []).slice(-10).reverse().map(e => ({
+    tokenNumber: e.tokenNumber,
+    ts: e.ts,
   }));
 
-  const total = q.total ?? q.shuffled?.length ?? 0;
   return json({
-    initialized: true,
-    total,
-    dispensed: q.counter ?? 0,
-    remaining: Math.max(0, total - (q.counter ?? 0)),
+    // User-facing
+    total: COLLECTION_TOTAL,
+    minted,
+    remaining,
+    confirmedViaSite: confirmed.length,
+    preMinted: PRE_MINTED.length,
+    recent: recentEntries,
+
+    // Diagnostic
+    queue: q ? {
+      total: q.total ?? q.shuffled?.length ?? 0,
+      counter: q.counter ?? 0,
+      remaining: Math.max(0, (q.shuffled?.length ?? 0) - (q.counter ?? 0)),
+    } : null,
     offerCount,
-    queueOffersAligned: offerCount === total,
-    recent,
+    queueOffersAligned: q ? offerCount === q.total : false,
+    initialized: !!q,
+
+    // Legacy fields (frontend code that wasn't updated still reads these)
+    dispensed: minted,
   });
 };
 
