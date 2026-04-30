@@ -53,44 +53,66 @@ export default async (req, context) => {
     return json({ error: "sold_out", remaining: 0 }, 410);
   }
 
-  // Pop next token number with optimistic concurrency. Up to 5 retries on
-  // contention.
+  // Pop next token + fetch offer. If the offer text is missing in storage
+  // (e.g., a partial bootstrap), advance the counter past it and try the next
+  // one. Up to 30 skips to avoid wasting time but allow surviving a noisy
+  // bootstrap. Each pop uses ETag-based CAS to prevent concurrent dispenses
+  // handing out the same token.
   let tokenNum = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    tokenNum = q.shuffled[q.counter];
-    const next = { ...q, counter: q.counter + 1 };
-    try {
-      await queue.setJSON("queue", next, { onlyIfMatch: etag });
-      break;
-    } catch (err) {
-      // Conflict — re-read and try again.
-      const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
-      if (!result) return json({ error: "queue_lost" }, 500);
-      q = result.data;
-      etag = result.etag;
-      if (q.counter >= q.shuffled.length) {
-        return json({ error: "sold_out", remaining: 0 }, 410);
+  let offerText = null;
+  const skipped = [];
+  const MAX_TRIES = 30;
+
+  for (let outer = 0; outer < MAX_TRIES; outer++) {
+    let popped = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      tokenNum = q.shuffled[q.counter];
+      const next = { ...q, counter: q.counter + 1 };
+      try {
+        await queue.setJSON("queue", next, { onlyIfMatch: etag });
+        popped = true;
+        break;
+      } catch (_) {
+        const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
+        if (!result) return json({ error: "queue_lost" }, 500);
+        q = result.data;
+        etag = result.etag;
+        if (q.counter >= q.shuffled.length) {
+          return json({ error: "sold_out", remaining: 0, skipped }, 410);
+        }
+        tokenNum = null;
       }
-      tokenNum = null;
-      if (attempt === 4) return json({ error: "queue_contention" }, 503);
+    }
+    if (!popped) {
+      return json({ error: "queue_contention", skipped }, 503);
+    }
+
+    // Try to fetch the offer for this token.
+    try {
+      offerText = await offers.get(`offer/${pad(tokenNum)}`);
+    } catch (err) {
+      // Hard storage error — bail.
+      return json({ error: "offer_read_failed", tokenNumber: tokenNum, detail: String(err) }, 500);
+    }
+
+    if (offerText && offerText.startsWith("offer1")) break;
+
+    // Missing or malformed — log and try the next token.
+    skipped.push(tokenNum);
+    offerText = null;
+    tokenNum = null;
+    // Refresh queue snapshot before next loop.
+    const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
+    if (!result) return json({ error: "queue_lost" }, 500);
+    q = result.data;
+    etag = result.etag;
+    if (q.counter >= q.shuffled.length) {
+      return json({ error: "sold_out", remaining: 0, skipped }, 410);
     }
   }
 
-  if (tokenNum == null) {
-    return json({ error: "queue_failed" }, 500);
-  }
-
-  // Fetch the offer text.
-  const key = `offer/${pad(tokenNum)}`;
-  let offerText;
-  try {
-    offerText = await offers.get(key);
-  } catch (err) {
-    return json({ error: "offer_read_failed", tokenNumber: tokenNum, detail: String(err) }, 500);
-  }
   if (!offerText) {
-    // Queue advanced but the offer is missing — log + fail this attempt.
-    return json({ error: "offer_missing", tokenNumber: tokenNum }, 500);
+    return json({ error: "no_valid_offer_found", skipped, hint: "Re-run scripts/upload_offers.mjs --force to repopulate offers." }, 500);
   }
 
   // Audit log (best-effort, non-blocking failure).

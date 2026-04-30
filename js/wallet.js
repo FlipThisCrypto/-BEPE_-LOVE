@@ -85,7 +85,13 @@ export async function getCurrentBech32Address(walletId = 1) {
     if (typeof result === "string") return result;
     return result?.address ?? result?.data ?? null;
   } catch (err) {
-    console.warn("getCurrentAddress failed:", err);
+    // Many wallets only approve chia_logIn at pairing time and reject optional
+    // methods. Soft-fail: callers handle a null bech32 address gracefully
+    // (the audit log just records fingerprint without xch1...).
+    const msg = String(err?.message || err);
+    if (!/Missing or invalid|not approved|disapproved/i.test(msg)) {
+      console.warn("getCurrentAddress failed:", err);
+    }
     return null;
   }
 }
