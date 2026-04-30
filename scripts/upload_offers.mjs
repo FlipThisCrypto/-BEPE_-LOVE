@@ -129,7 +129,8 @@ async function batchWorker() {
     if (idx >= batches.length) return;
     const batch = batches[idx];
     let attempt = 0;
-    while (true) {
+    let success = false;
+    while (!success) {
       try {
         const r = await postAdmin({ action: "upload-batch", offers: batch });
         if (r.error) throw new Error(r.error + (r.detail ? ": " + r.detail : ""));
@@ -137,7 +138,7 @@ async function batchWorker() {
         if (idx === 0 || (idx + 1) % 5 === 0 || idx === batches.length - 1) {
           console.log(`  batch ${idx + 1}/${batches.length} done · ${totalUploaded} offers uploaded so far`);
         }
-        return;
+        success = true;
       } catch (err) {
         attempt++;
         if (attempt >= 3) { throw err; }
@@ -146,11 +147,19 @@ async function batchWorker() {
         await new Promise(r => setTimeout(r, wait));
       }
     }
+    // ...continue grabbing more batches via the outer while loop
   }
 }
 
 await Promise.all(Array.from({ length: BATCH_CONCURRENCY }, () => batchWorker()));
 console.log(`Done uploading. Total: ${totalUploaded} offers.`);
+
+if (totalUploaded < records.length) {
+  console.error(`\n  ⚠ Only ${totalUploaded}/${records.length} offers were uploaded.`);
+  console.error(`  This will leave gaps in the dispenser. Investigate before initializing the queue.`);
+  console.error(`  Re-run with --force after fixing the underlying issue.`);
+  process.exit(2);
+}
 
 // ----- init queue -----
 const tokenNumbers = records.map(r => r.tokenNum);
