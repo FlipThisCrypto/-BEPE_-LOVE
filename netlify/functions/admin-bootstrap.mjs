@@ -89,6 +89,26 @@ export default async (req) => {
       return json({ ok: true, wiped: true });
     }
 
+    // Replace the confirmed-set with an explicit list of token numbers.
+    // Use this to repair drift (e.g., when /api/mint/confirm got spammed).
+    // Body: { secret, action: "set-confirmed", tokens: [1, 85, 237, ...] }
+    if (body.action === "set-confirmed") {
+      if (!Array.isArray(body.tokens)) return json({ error: "missing_tokens" }, 400);
+      const tokens = [...new Set(
+        body.tokens
+          .map(Number)
+          .filter(n => Number.isInteger(n) && n >= 1 && n <= 2222)
+      )].sort((a, b) => a - b);
+      const entries = tokens.map(t => ({ tokenNumber: t, ts: Date.now(), source: "admin-set" }));
+      await queue.setJSON("confirmed-set", { tokens, entries });
+      return json({ ok: true, totalConfirmed: tokens.length, tokens });
+    }
+
+    if (body.action === "wipe-confirmed") {
+      await queue.delete("confirmed-set").catch(() => {});
+      return json({ ok: true, wiped: "confirmed-set" });
+    }
+
     return json({ error: "unknown_action" }, 400);
   } catch (err) {
     return json({ error: "internal", detail: String(err.message || err) }, 500);

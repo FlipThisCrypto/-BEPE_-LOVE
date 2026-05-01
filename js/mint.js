@@ -95,11 +95,14 @@ async function onMintClick() {
   if (takeResult.ok) {
     // Tell the server this mint actually went through so the public counter
     // reflects reality. Best-effort — failures here don't block the user.
+    // The claimToken from /api/mint/random proves this confirm is tied to a
+    // real dispense, so the endpoint can't be spammed by random POSTs.
     fetch(CONFIRM_API, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         tokenNumber: offerData.tokenNumber,
+        claimToken: offerData.claimToken,
         walletFingerprint: info.fingerprint,
       }),
     }).catch(err => console.warn("mint-confirm POST failed:", err));

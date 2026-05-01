@@ -24,9 +24,27 @@ export default async (req) => {
     return json({ error: "invalid_tokenNumber" }, 400);
   }
 
+  const claimToken = typeof body?.claimToken === "string" ? body.claimToken : null;
+  if (!claimToken) {
+    return json({ error: "missing_claim_token", hint: "Confirms must include a claimToken issued by /api/mint/random." }, 400);
+  }
+
   const fp = typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null;
   const queue = getStore("bepe-mint-queue");
   const offers = getStore("bepe-mint-offers");
+
+  // Validate the claim — must exist, match this tokenNumber, and not be older
+  // than 24 hours. Delete it after use so it can't be replayed.
+  const claim = await queue.get(`claims/${claimToken}`, { type: "json" });
+  if (!claim || claim.tokenNumber !== tokenNum) {
+    return json({ error: "invalid_claim_token" }, 401);
+  }
+  if (Date.now() - (claim.ts || 0) > 24 * 60 * 60 * 1000) {
+    await queue.delete(`claims/${claimToken}`).catch(() => {});
+    return json({ error: "claim_expired" }, 410);
+  }
+  // Consume the claim (one-shot).
+  await queue.delete(`claims/${claimToken}`).catch(() => {});
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let current;

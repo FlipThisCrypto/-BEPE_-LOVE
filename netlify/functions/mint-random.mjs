@@ -115,6 +115,17 @@ export default async (req, context) => {
     return json({ error: "no_valid_offer_found", skipped, hint: "Re-run scripts/upload_offers.mjs --force to repopulate offers." }, 500);
   }
 
+  // Generate a one-time claim token tied to this dispense. The frontend will
+  // include it in /api/mint/confirm; the confirm endpoint validates the claim
+  // matches the token number, then deletes it. This prevents anyone from
+  // pumping the public mint counter by hitting /api/mint/confirm directly.
+  const claimToken = randomToken();
+  await queue.setJSON(`claims/${claimToken}`, {
+    tokenNumber: tokenNum,
+    ts: Date.now(),
+    fp: typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null,
+  }).catch(err => console.warn("claim store failed:", err));
+
   // Audit log (best-effort, non-blocking failure).
   try {
     const dispensedEntry = {
@@ -133,12 +144,20 @@ export default async (req, context) => {
     tokenNumber: tokenNum,
     offerText,
     remaining: Math.max(0, q.shuffled.length - q.counter - 1),
+    claimToken,
   });
 };
 
 export const config = {
   path: "/api/mint/random",
 };
+
+function randomToken() {
+  // 22 url-safe chars from crypto-grade randomness via globalThis.crypto.
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 22);
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
