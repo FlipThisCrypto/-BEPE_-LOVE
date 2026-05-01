@@ -156,7 +156,7 @@ h1 {
   font-size: clamp(46px, 9vw, 104px);
   line-height: 0.87;
   margin: 0 0 22px;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.04em;
 }
 
 .gradient {
@@ -165,6 +165,12 @@ h1 {
   background-clip: text;
   color: transparent;
   text-shadow: 0 0 38px rgba(255, 42, 163, 0.14);
+  /* background-clip: text crops to the natural glyph bounds — bold + tight
+     letter-spacing can shave a sliver off the rightmost character on some
+     browsers. inline-block + a hair of right padding gives breathing room
+     without visibly shifting the layout. */
+  display: inline-block;
+  padding-right: 0.06em;
 }
 
 .lead {
