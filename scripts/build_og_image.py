@@ -145,10 +145,17 @@ def main() -> None:
     )
     draw.text((W - (tx1 - tx0) - 80, 78), tag_text, fill=GOLD, font=tag_font)
 
-    # Headline — big "Bepe Love"
+    # Headline — domain-style "Bepe.Love" on one line, measured so segments
+    # don't overlap. Bepe in white, the dot in orange as a brand accent,
+    # Love in gold.
     h1_font = load_font(110, bold=True)
-    draw.text((60, 168), "Bepe", fill=WHITE, font=h1_font)
-    draw.text((280, 168), "Love.", fill=GOLD, font=h1_font)
+    parts = [("Bepe", WHITE), (".", ORANGE), ("Love", GOLD)]
+    cursor_x = 60
+    headline_y = 168
+    for text, color in parts:
+        draw.text((cursor_x, headline_y), text, fill=color, font=h1_font)
+        bbox = draw.textbbox((cursor_x, headline_y), text, font=h1_font)
+        cursor_x = bbox[2]  # right edge becomes left edge of next part
 
     # Tagline
     tag2_font = load_font(22, bold=False)
