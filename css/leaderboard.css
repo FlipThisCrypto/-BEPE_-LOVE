@@ -1,0 +1,129 @@
+/* Public leaderboard panel — shown on play.html and match.html under
+   the user's local stats. */
+
+.leaderboard {
+  margin-top: 28px;
+}
+
+.lb-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+
+.lb-myrank b {
+  color: #ffd08a;
+  font-size: 14px;
+}
+
+.lb-status {
+  color: var(--ink-2);
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+.lb-status.muted { font-style: italic; }
+
+.lb-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 50px 1fr auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lb-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lb-row.me {
+  background: linear-gradient(90deg, rgba(255, 122, 0, 0.18), rgba(255, 42, 163, 0.06));
+  border-color: rgba(255, 122, 0, 0.6);
+  box-shadow: 0 0 18px rgba(255, 122, 0, 0.15);
+}
+
+.lb-row.medal-1 { border-color: rgba(255, 208, 106, 0.55); }
+.lb-row.medal-2 { border-color: rgba(200, 200, 220, 0.4); }
+.lb-row.medal-3 { border-color: rgba(205, 127, 50, 0.5); }
+
+.lb-rank {
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-row.medal-1 .lb-rank,
+.lb-row.medal-2 .lb-rank,
+.lb-row.medal-3 .lb-rank {
+  font-size: 22px;
+}
+
+.lb-name {
+  font-weight: 800;
+  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-row.me .lb-name::after {
+  content: " (you)";
+  color: #ffd08a;
+  font-weight: 700;
+}
+
+.lb-sub {
+  color: var(--ink-2);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lb-score {
+  font-weight: 900;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: white;
+}
+
+.lb-unit {
+  color: var(--ink-2);
+  font-weight: 700;
+  font-size: 11px;
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.muted { color: var(--ink-2); }
+
+@media (max-width: 600px) {
+  .lb-row {
+    grid-template-columns: 40px 1fr auto;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .lb-sub { display: none; }
+  .lb-score { font-size: 14px; }
+}

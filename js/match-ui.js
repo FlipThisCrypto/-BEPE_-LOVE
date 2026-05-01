@@ -8,7 +8,8 @@ import { loadManifest, tierClass } from "./data.js";
 import {
   DIFFICULTIES, buildBoard, isMatch, scoreMatch, completionBonus, missPenalty, traitLabel,
 } from "./match-engine.js";
-import { recordMatchRound, getMatchStats, getProfile, setProfileName } from "./score-store.js";
+import { recordMatchRound, getMatchStats, getProfile, setProfileName, submitToLeaderboard } from "./score-store.js";
+import { renderLeaderboard } from "./leaderboard.js";
 
 let manifest = [];
 let view = "home";
@@ -90,6 +91,12 @@ function renderHome() {
       ` : `<p style="color:var(--ink-2); margin-top:18px;">No rounds yet — pick a difficulty above and start.</p>`}
     </section>
 
+    <section class="section leaderboard">
+      <h2>🏆 Global Leaderboard</h2>
+      <p style="color: var(--ink-2); margin: 0 0 6px;">Best score per wallet. Connect your wallet to track your rank.</p>
+      <div id="matchLeaderboardMount"></div>
+    </section>
+
     <section class="section">
       <h2>How to play</h2>
       <div class="grid-3">
@@ -110,6 +117,7 @@ function wireHome() {
   });
   $("#startGame")?.addEventListener("click", startGame);
   $("#profileName")?.addEventListener("change", (e) => setProfileName(e.target.value));
+  renderLeaderboard("match", "#matchLeaderboardMount").catch(() => {});
 }
 
 // ---------- GAME ----------
@@ -296,6 +304,15 @@ function finishGame() {
   };
 
   recordMatchRound(lastResult);
+
+  // Best-effort public leaderboard submit
+  submitToLeaderboard("match", {
+    score: lastResult.score,
+    time: lastResult.timeMs,
+    pairs: lastResult.pairs,
+    difficulty: lastResult.difficulty,
+  }).catch(() => {});
+
   setTimeout(() => setView("result"), 700);
 }
 

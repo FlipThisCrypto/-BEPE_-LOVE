@@ -3,9 +3,10 @@
 
 import { loadManifest, tierClass, elementClass, pickRandom } from "./data.js";
 import { runMatch, draftOpponentHand } from "./brawl-engine.js";
-import { recordBrawlMatch, getBrawlStats, getProfile, setProfileName } from "./score-store.js";
+import { recordBrawlMatch, getBrawlStats, getProfile, setProfileName, submitToLeaderboard } from "./score-store.js";
 import { getAddressInfo, getCurrentBech32Address } from "./wallet.js";
 import { getOwnedBepeRecords } from "./indexer.js";
+import { renderLeaderboard } from "./leaderboard.js";
 
 let manifest = [];
 let view = "home";              // home | pick | battle | result
@@ -103,6 +104,12 @@ function renderHome() {
       ` : `<p style="color:var(--ink-2); margin-top:18px;">No matches yet — hit Quick Brawl above.</p>`}
     </section>
 
+    <section class="section leaderboard">
+      <h2>🏆 Global Leaderboard</h2>
+      <p style="color: var(--ink-2); margin: 0 0 6px;">Longest win streak. Connect your wallet to track your rank across devices.</p>
+      <div id="brawlLeaderboardMount"></div>
+    </section>
+
     <section class="section">
       <h2>How a brawl plays out</h2>
       <div class="grid-3">
@@ -132,6 +139,8 @@ function wireHome() {
   $("#quickBrawl")?.addEventListener("click", quickBrawl);
   $("#pickHand")?.addEventListener("click", () => setView("pick"));
   $("#profileName")?.addEventListener("change", (e) => setProfileName(e.target.value));
+  // Hydrate the leaderboard panel
+  renderLeaderboard("brawl", "#brawlLeaderboardMount").catch(() => {});
 }
 
 function quickBrawl() {
@@ -400,6 +409,16 @@ function finishBattle() {
   };
   recordBrawlMatch(summary);
   lastMatch = { match, oppHand };
+
+  // Best-effort public leaderboard submit. Uses longest streak as the
+  // single ranking metric. No-op if no wallet connected.
+  const stats = getBrawlStats();
+  submitToLeaderboard("brawl", {
+    score: stats.longestStreak,
+    wins: stats.wins,
+    matches: stats.matches,
+  }).catch(() => {});
+
   setView("result");
 }
 

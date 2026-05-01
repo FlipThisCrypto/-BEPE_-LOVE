@@ -549,7 +549,9 @@ h1 {
   border-radius: 26px;
   overflow: hidden;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  /* Fully opaque so when sticky cards overlap during scroll, the card in
+     front blocks the bleed-through of text from cards behind it. */
+  background: linear-gradient(180deg, #14091f 0%, #06040f 100%);
   box-shadow: 0 40px 80px rgba(0, 0, 0, 0.45);
   aspect-ratio: 3 / 4;
 }
@@ -562,6 +564,8 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  /* Solid floor under the text so it stays sharp when cards overlap */
+  background: #06040f;
 }
 
 .stack-card .body .title { font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }

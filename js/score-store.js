@@ -154,5 +154,30 @@ export function getMatchStats() {
 
 // ---------- Wipe (debug / reset) ----------
 export function reset() {
-  localStorage.removeItem(KEY);
+  localStorage.removeItem(keyFor());
+}
+
+// ---------- Public leaderboard ----------
+// Submit the wallet's current best to the global leaderboard. No-op when no
+// wallet is connected. Best-effort: failures don't disrupt gameplay.
+export async function submitToLeaderboard(game, payload) {
+  if (activeFingerprint === ANON_FINGERPRINT) return null;
+  const profile = getProfile();
+  try {
+    const res = await fetch("/api/score/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        game,
+        wallet: activeFingerprint,
+        name: profile.name || null,
+        ...payload,
+      }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Leaderboard submit failed:", err);
+    return null;
+  }
 }
