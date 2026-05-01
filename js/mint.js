@@ -105,9 +105,15 @@ async function onMintClick() {
     }).catch(err => console.warn("mint-confirm POST failed:", err));
     showResult({ kind: "success", tokenNumber: offerData.tokenNumber });
   } else {
+    // Wallets that don't support chia_takeOffer (e.g., the Chia reference
+    // wallet) reject with "Invalid Request". The offer is still valid — fall
+    // back to a manual file download so the user can import it into their
+    // wallet themselves. NO XCH has been spent at this point; takeOffer
+    // failed before any transaction was sent.
     showResult({
       kind: "wallet-error",
       tokenNumber: offerData.tokenNumber,
+      offerText: offerData.offerText,
       reason: takeResult.reason,
     });
   }
@@ -167,25 +173,49 @@ function showResult(res) {
     `;
   } else if (res.kind === "wallet-error") {
     const isPermErr = /Missing or invalid|not approved|disapproved|disconnect and reconnect/i.test(res.reason || "");
+    const isUnsupported = /Invalid Request|UNSUPPORTED_METHODS|method not found/i.test(res.reason || "");
+
+    // Always offer the offer-file download — no XCH has been spent yet, and
+    // every Chia wallet can import an offer file manually. This is the
+    // safety net for anyone not on Sage.
+    const blob = res.offerText ? new Blob([res.offerText], { type: "text/plain" }) : null;
+    const downloadUrl = blob ? URL.createObjectURL(blob) : null;
+
     panel.innerHTML = `
-      <div class="mint-result-card error">
+      <div class="mint-result-card fallback">
         <div class="mint-result-head">
-          <span class="mr-emoji">${isPermErr ? "🔐" : "⚠️"}</span>
-          <h3>${isPermErr ? "Wallet permissions need a refresh" : "Wallet didn't accept the offer"}</h3>
+          <span class="mr-emoji">📥</span>
+          <h3>Mint Bepe Love #${pad(res.tokenNumber)} manually</h3>
         </div>
-        ${isPermErr ? `
-          <p>Your wallet was paired before <b>chia_takeOffer</b> was added to the required permissions.
-          Disconnect and reconnect once to grant the new permission, then click Mint again.</p>
+
+        <p><b>No XCH has been spent</b> — your wallet rejected the auto-mint request before any transaction. The offer for #${pad(res.tokenNumber)} is still claimable; you just need to import it manually.</p>
+
+        <p style="margin: 14px 0 6px;"><b>Why this happened:</b> ${
+          isPermErr
+            ? "your wallet session was paired before <code>chia_takeOffer</code> was a required permission. Disconnect and reconnect once and the next mint should be one-click."
+            : isUnsupported
+              ? "your wallet doesn't support <code>chia_takeOffer</code> over WalletConnect yet. <b>Sage Wallet</b> is the recommended wallet for one-click mint. Other wallets need the manual import below."
+              : `the wallet returned <code>${escapeHtml(res.reason || "unknown reason")}</code>.`
+        }</p>
+
+        ${downloadUrl ? `
+          <p style="margin-top: 18px;">
+            <a class="btn primary" href="${downloadUrl}" download="bepe_love_${pad(res.tokenNumber)}.offer">⬇ Download offer file</a>
+          </p>
           <ol class="mint-instructions">
-            <li>Click the green <b>wallet button</b> at the top right.</li>
-            <li>Confirm <b>Disconnect</b>.</li>
-            <li>Click <b>Connect Wallet</b> again and approve the new pairing in your Chia wallet.</li>
-            <li>Click <b>Mint a Random Bepe</b> again — the spend prompt will pop up in your wallet.</li>
+            <li>Open your Chia wallet.</li>
+            <li>Go to <b>Offers</b> → <b>View an Offer</b> (or <b>Take an Offer</b>).</li>
+            <li>Drag the downloaded file in (or paste its contents).</li>
+            <li>Confirm the <b>2 XCH</b> payment and accept.</li>
+            <li>Bepe Love #${pad(res.tokenNumber)} arrives in ~30 seconds.</li>
           </ol>
-        ` : `
-          <p>The wallet returned: <code>${escapeHtml(res.reason || "unknown reason")}</code></p>
-          <p>This Bepe (#${pad(res.tokenNumber)}) is now reserved as dispensed. Try clicking Mint again to draw a fresh one.</p>
-        `}
+        ` : ""}
+
+        ${isPermErr ? `
+          <p style="margin-top: 14px; color: var(--ink-2); font-size: 13px;">
+            <b>Or skip the manual step:</b> click the wallet button (top right) → <b>Disconnect</b> → <b>Connect Wallet</b> → approve the new permissions in your wallet, then click Mint again.
+          </p>
+        ` : ""}
       </div>
     `;
   } else {

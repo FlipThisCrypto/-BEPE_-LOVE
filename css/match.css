@@ -78,14 +78,19 @@
 
 .match-board {
   display: grid;
-  gap: 14px;
-  max-width: 980px;
+  gap: 12px;
+  /* Cap each card at roughly 140px so the board fits common viewports
+     without forcing huge cards. Hard mode (6 cols) caps at ~960px wide;
+     Easy/Medium (4 cols) caps at ~640px wide. Centered. */
+  max-width: min(960px, 95vw);
   margin: 0 auto;
 }
 
 .match-card {
   position: relative;
-  aspect-ratio: 3 / 4;
+  /* Square cards save ~25% vertical space vs the old 3:4 portrait — Hard
+     mode's 4 rows used to overflow most laptop screens. */
+  aspect-ratio: 1 / 1;
   perspective: 800px;
   cursor: pointer;
 }
@@ -234,11 +239,14 @@
 @media (max-width: 800px) {
   .difficulty-row { grid-template-columns: 1fr; max-width: 360px; }
   .hud { grid-template-columns: repeat(2, 1fr); max-width: 360px; }
-  .match-board { gap: 10px; }
+  .match-board { gap: 8px; }
+  .mc-trait .trait-value { font-size: 11px; }
 }
 
 @media (max-width: 520px) {
-  .mc-trait .trait-value { font-size: 11px; }
+  .mc-trait .trait-value { font-size: 10px; }
+  .mc-trait .trait-label { font-size: 8px; }
   .mc-back { font-size: 28px; }
   .score-flash { font-size: 48px; }
+  .match-board-shell { padding: 12px; }
 }

@@ -9,12 +9,19 @@
 import { pickRandom } from "./data.js";
 
 // Difficulty presets. `pairs` = how many trait-matched pairs on the board.
-// `traits` = which trait categories are eligible for the round.
+// `traits` = which trait categories are eligible for the round. Each listed
+// trait must have AT LEAST `pairs` distinct values with ≥2 NFTs each, or
+// buildBoard's defensive fallback kicks in.
+//
+// Trait variety in this collection (values with ≥2 NFTs):
+//   eyes 25, accessory 15, background 11, mouth 9, jacket 9, face 7, patch 6
 export const DIFFICULTIES = {
-  easy:   { pairs: 6,  cols: 4, label: "Easy",   traits: ["background", "jacket"] },
-  medium: { pairs: 8,  cols: 4, label: "Medium", traits: ["eyes", "patch", "accessory"] },
-  hard:   { pairs: 12, cols: 6, label: "Hard",   traits: ["mouth", "face", "patch"] },
+  easy:   { pairs: 6,  cols: 4, label: "Easy",   traits: ["background", "jacket", "mouth", "face", "patch"] },
+  medium: { pairs: 8,  cols: 4, label: "Medium", traits: ["background", "eyes", "mouth", "jacket", "accessory"] },
+  hard:   { pairs: 12, cols: 6, label: "Hard",   traits: ["eyes", "accessory"] },
 };
+
+const ALL_TRAITS = ["background", "face", "eyes", "mouth", "jacket", "patch", "accessory"];
 
 const TRAIT_LABELS = {
   background: "Background",
@@ -32,24 +39,43 @@ export function traitLabel(t) {
 
 // Build a board: pick a trait, find `pairs` distinct values that have at
 // least 2 NFTs each, pick 2 NFTs per value, shuffle. Returns { trait, value, cards }.
+//
+// Defensive: if the random pick from cfg.traits doesn't have enough distinct
+// values for `pairs`, search the rest of the traits in cfg.traits, then any
+// trait, before giving up. Hard mode in particular can only use eyes (25
+// values) or accessory (15) — never let an unlucky pick crash the page.
 export function buildBoard(manifest, difficulty = "easy") {
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES.easy;
-  const trait = pickRandom(cfg.traits, 1)[0];
 
-  // Group NFTs by their value for this trait.
-  const groups = new Map();
-  for (const nft of manifest) {
-    const v = nft.traits[trait];
-    if (!v) continue;
-    if (!groups.has(v)) groups.set(v, []);
-    groups.get(v).push(nft);
+  function eligibleGroups(trait) {
+    const groups = new Map();
+    for (const nft of manifest) {
+      const v = nft.traits[trait];
+      if (!v) continue;
+      if (!groups.has(v)) groups.set(v, []);
+      groups.get(v).push(nft);
+    }
+    return [...groups.entries()].filter(([_, list]) => list.length >= 2);
   }
 
-  // Keep only groups with at least 2 NFTs.
-  const eligible = [...groups.entries()].filter(([_, list]) => list.length >= 2);
-  if (eligible.length < cfg.pairs) {
-    // Should never happen with this collection, but fall back gracefully.
-    throw new Error(`Not enough trait values with >=2 NFTs for ${trait}`);
+  // Try the configured traits in random order, then fall back to any trait
+  // with enough variety.
+  const tryOrder = [
+    ...pickRandom(cfg.traits, cfg.traits.length),
+    ...ALL_TRAITS.filter(t => !cfg.traits.includes(t)),
+  ];
+  let trait = null;
+  let eligible = null;
+  for (const candidate of tryOrder) {
+    const groups = eligibleGroups(candidate);
+    if (groups.length >= cfg.pairs) {
+      trait = candidate;
+      eligible = groups;
+      break;
+    }
+  }
+  if (!trait) {
+    throw new Error(`No trait has ≥${cfg.pairs} eligible values across the full collection`);
   }
 
   // Pick `pairs` distinct values. Prefer values that aren't all the same NFTs
