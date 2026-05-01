@@ -14,8 +14,10 @@
 import { getStore } from "@netlify/blobs";
 
 const COLLECTION_TOTAL = 2222;
-// Tokens minted before the dispenser was bootstrapped — counted as minted.
-const PRE_MINTED = [1, 85];
+// Pre-bootstrap mints used to live as a hardcoded constant. Now they're
+// expected to be present in the confirmed-set itself (seeded via
+// /api/admin/bootstrap "set-confirmed"). Set is the single source of truth.
+const PRE_MINTED = [];
 
 export default async () => {
   const queue = getStore("bepe-mint-queue");
