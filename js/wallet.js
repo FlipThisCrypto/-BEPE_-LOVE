@@ -121,10 +121,18 @@ export async function connect() {
     requiredNamespaces: {
       chia: {
         methods: [
-          // Login is universally supported. Mint flow needs takeOffer at
-          // pairing so Sage approves it; reference wallet approves blindly.
+          // Login + identity
           "chia_logIn",
+          // Address resolution — list both because Sage and the reference
+          // wallet implement different ones. Wallets approve methods they
+          // don't implement at pairing time anyway (we've observed this);
+          // runtime resolution tries both and uses whichever works.
+          "chia_getAddress",          // Sage's canonical
+          "chia_getCurrentAddress",   // Chia reference wallet's canonical
+          // Mint flow
           "chia_takeOffer",
+          // Rewards-claim signature
+          "chia_signMessageByAddress",
         ],
         chains: [DEFAULT_CHAIN],
         events: [],
@@ -133,17 +141,9 @@ export async function connect() {
     optionalNamespaces: {
       chia: {
         methods: [
-          // Address resolution — different wallets implement different
-          // methods. Sage uses chia_getAddress; the reference wallet uses
-          // chia_getCurrentAddress. Listing both as optional lets each
-          // wallet approve only what it supports.
-          "chia_getAddress",
-          "chia_getCurrentAddress",
           "chia_getNextAddress",
           "chia_getWallets",
           "chia_getWalletBalance",
-          // Rewards-claim signature path
-          "chia_signMessageByAddress",
         ],
         chains: [DEFAULT_CHAIN],
         events: [],
