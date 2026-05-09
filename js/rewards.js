@@ -65,26 +65,14 @@ function stripHexPrefix(s) {
 }
 
 // ---------- address resolution ----------
-// Try cheapest first (CAIP-10), then RPC variants. Sage exposes chia_getAddress;
-// reference wallet uses chia_getCurrentAddress (which our wallet.js already
-// calls in getCurrentBech32Address).
+// wallet.js's getCurrentBech32Address now tries chia_getAddress (Sage) then
+// chia_getCurrentAddress (reference wallet) internally, so a single call
+// here covers both wallets.
 
 async function resolveWalletAddress() {
   const info = getAddressInfo();
   if (!info) return null;
-
-  // Reference-wallet path (already in our requiredNamespaces)
-  let addr = await getCurrentBech32Address().catch(() => null);
-  if (addr && addr.startsWith("xch1")) return addr;
-
-  // Sage path — chia_getAddress is in optionalNamespaces
-  try {
-    const result = await requestRpc("chia_getAddress", {});
-    const a = typeof result === "string" ? result : (result?.address ?? result?.data ?? null);
-    if (a && a.startsWith("xch1")) return a;
-  } catch (_) { /* method not approved or not supported */ }
-
-  return null;
+  return await getCurrentBech32Address().catch(() => null);
 }
 
 // ---------- bootstrap ----------

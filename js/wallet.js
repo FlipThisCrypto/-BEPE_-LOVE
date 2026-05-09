@@ -85,20 +85,34 @@ export async function requestRpc(method, params = {}) {
 
 export async function getCurrentBech32Address(walletId = 1) {
   if (!session) return null;
-  try {
-    const result = await requestRpc("chia_getCurrentAddress", { walletId });
-    if (typeof result === "string") return result;
-    return result?.address ?? result?.data ?? null;
-  } catch (err) {
-    // Wallets that don't approve this at pairing reject locally before any
-    // wire request. Soft-fail: caller handles null bech32 (audit log records
-    // fingerprint only).
-    const msg = String(err?.message || err);
-    if (!/Missing or invalid|not approved|disapproved/i.test(msg)) {
-      console.warn("getCurrentAddress failed:", err);
+
+  // Different wallets implement different address methods. Try in order of
+  // likelihood: Sage's chia_getAddress first (most common modern wallet),
+  // then the reference wallet's chia_getCurrentAddress. Each call is
+  // wrapped — if the method isn't approved or the wallet returns
+  // "Unsupported method", we fall through to the next.
+  const attempts = [
+    { method: "chia_getAddress",        params: {} },
+    { method: "chia_getCurrentAddress", params: { walletId } },
+  ];
+
+  for (const { method, params } of attempts) {
+    try {
+      const result = await requestRpc(method, params);
+      const addr = typeof result === "string"
+        ? result
+        : result?.address ?? result?.data ?? null;
+      if (addr && typeof addr === "string" && addr.startsWith("xch1")) return addr;
+    } catch (err) {
+      const msg = String(err?.message || err);
+      // Expected paths: method not approved at pairing, wallet doesn't
+      // implement it, or pairing rejected. Stay quiet on these.
+      if (!/Missing or invalid|not approved|disapproved|Unsupported method|code.+4001/i.test(msg)) {
+        console.warn(`${method} failed:`, err);
+      }
     }
-    return null;
   }
+  return null;
 }
 
 export async function connect() {
@@ -107,10 +121,9 @@ export async function connect() {
     requiredNamespaces: {
       chia: {
         methods: [
-          // Login + read
+          // Login is universally supported. Mint flow needs takeOffer at
+          // pairing so Sage approves it; reference wallet approves blindly.
           "chia_logIn",
-          "chia_getCurrentAddress",
-          // Mint flow
           "chia_takeOffer",
         ],
         chains: [DEFAULT_CHAIN],
@@ -120,13 +133,17 @@ export async function connect() {
     optionalNamespaces: {
       chia: {
         methods: [
+          // Address resolution — different wallets implement different
+          // methods. Sage uses chia_getAddress; the reference wallet uses
+          // chia_getCurrentAddress. Listing both as optional lets each
+          // wallet approve only what it supports.
+          "chia_getAddress",
+          "chia_getCurrentAddress",
           "chia_getNextAddress",
           "chia_getWallets",
           "chia_getWalletBalance",
+          // Rewards-claim signature path
           "chia_signMessageByAddress",
-          // Sage's preferred address method (returns xch1 directly).
-          // Reference wallet uses chia_getCurrentAddress (in required).
-          "chia_getAddress",
         ],
         chains: [DEFAULT_CHAIN],
         events: [],
