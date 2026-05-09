@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rewards · Bepe Love</title>
+  <meta name="description" content="Bepe Love NFT holder rewards. 25% of every NFT sale routes to a pool wallet, then auto-distributes to holders by tier each epoch." />
+  <meta name="theme-color" content="#06040f" />
+  <meta name="rewards-api" content="https://bepe-rewards.bepelove.workers.dev" />
+
+  <meta property="og:title" content="Rewards · Bepe Love" />
+  <meta property="og:description" content="Holder rewards from every Bepe Love NFT sale. Connect your wallet to view your claim." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bepelove.netlify.app/rewards.html" />
+  <meta property="og:image" content="https://bepelove.netlify.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://bepelove.netlify.app/og-image.png" />
+
+  <link rel="preconnect" href="https://rsms.me/" crossorigin />
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/wallet.css" />
+  <link rel="stylesheet" href="css/rewards.css" />
+</head>
+<body>
+  <main class="page">
+    <header>
+      <a class="brand" href="index.html">
+        <div class="brand-mark">♥</div>
+        <div>$BEPE $LOVE</div>
+      </a>
+      <nav>
+        <a href="index.html#about">About</a>
+        <a href="index.html#gallery">Gallery</a>
+        <a href="play.html">Brawl</a>
+        <a href="match.html">Match</a>
+        <a class="cta" href="rewards.html">Rewards</a>
+      </nav>
+    </header>
+
+    <section class="rewards-hero">
+      <div class="eyebrow">Holder Rewards · Live</div>
+      <h1><span class="gradient">Bepe.Rewards</span></h1>
+      <p class="lead">
+        25% of every Bepe Love NFT sale auto-routes to a pool wallet. Each epoch, the
+        balance splits among holders by tier. Connect your wallet to see what you're owed
+        and claim it across all unclaimed epochs in one transaction.
+      </p>
+
+      <div class="rewards-kpis">
+        <div class="kpi">
+          <span class="kpi-label">Current Epoch</span>
+          <span class="kpi-value" id="kpiEpoch">…</span>
+          <span class="kpi-sub" id="kpiEpochWindow"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Pool This Epoch</span>
+          <span class="kpi-value" id="kpiCurXch">…</span>
+          <span class="kpi-sub">XCH</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Last Closed</span>
+          <span class="kpi-value" id="kpiLastClosed">…</span>
+          <span class="kpi-sub" id="kpiLastClosedXch"></span>
+        </div>
+      </div>
+
+      <div class="pool-row">
+        <div class="pool-cell">
+          <span class="pool-label">Pool Cold Wallet</span>
+          <code id="poolAddr">—</code>
+          <a id="poolLink" href="#" target="_blank" rel="noopener">Spacescan ↗</a>
+        </div>
+        <div class="pool-cell">
+          <span class="pool-label">Pool Hot Wallet (payouts)</span>
+          <code id="payoutAddr">—</code>
+          <a id="payoutLink" href="#" target="_blank" rel="noopener">Spacescan ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Claim card — shown once a wallet is connected -->
+    <section class="section claim-card" id="claimCard" hidden>
+      <div class="card-head">
+        <h2>Your Claim</h2>
+        <span class="phase-badge" id="phaseBadge">Phase 1 · audit-only</span>
+      </div>
+      <div class="claim-body">
+        <div class="claim-total">
+          <span class="kpi-label">Total Owed (across all unclaimed epochs)</span>
+          <span class="claim-total-val" id="claimTotal">…</span>
+          <span class="kpi-sub">XCH</span>
+        </div>
+
+        <div class="claim-mini-row">
+          <div class="claim-mini">
+            <span class="kpi-label">Your Wallet Has Claimed</span>
+            <span class="claim-mini-val" id="walletPaid">—</span>
+            <span class="kpi-sub">XCH lifetime</span>
+          </div>
+          <div class="claim-mini">
+            <span class="kpi-label">Total Paid (All Wallets)</span>
+            <span class="claim-mini-val" id="totalPaid">—</span>
+            <span class="kpi-sub">XCH lifetime</span>
+          </div>
+        </div>
+
+        <div id="claimDetail" class="claim-detail"></div>
+
+        <div class="actions">
+          <button class="btn ghost" id="refreshBtn">Refresh</button>
+          <button class="btn primary" id="claimBtn" disabled title="Connect a wallet to authorize a claim">⚡ Claim</button>
+        </div>
+        <p class="claim-note muted" id="claimNote"></p>
+      </div>
+    </section>
+
+    <!-- Connect prompt — shown when no wallet -->
+    <section class="section" id="connectPrompt">
+      <h2>Connect a Chia wallet to see your claim</h2>
+      <p>Use the wallet button in the top-right (Sage Wallet, Goby, or the Chia reference wallet — anything that supports WalletConnect v2). Read-only: connecting only fetches your address.</p>
+    </section>
+
+    <!-- Recent epochs -->
+    <section class="section">
+      <div class="card-head"><h2>Recent Epochs</h2></div>
+      <div id="epochList" class="epoch-list">
+        <div class="epoch-row loading">Loading epoch history…</div>
+      </div>
+    </section>
+
+    <!-- Tier table -->
+    <section class="section">
+      <div class="card-head"><h2>Tier Table</h2></div>
+      <table class="tier-table" id="tierTable">
+        <thead><tr><th>Tier</th><th>Ranks</th><th>Count</th><th>Epoch Share</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted small">If a tier has zero held NFTs at the snapshot block, that tier's share stays in the pool wallet — it does not redistribute.</p>
+    </section>
+
+    <!-- How it works -->
+    <section class="section">
+      <h2>How it works</h2>
+      <div class="grid-3">
+        <div class="feature"><b>1. Sale routes to pool</b><p>25% of every Bepe Love NFT sale lands in the pool wallet automatically via SplitXCH.</p></div>
+        <div class="feature"><b>2. Epoch closes</b><p>Every 768 blocks (~4 hours at POC settings), the epoch closes. The Worker snapshots NFT ownership at the last block.</p></div>
+        <div class="feature"><b>3. Holders claim</b><p>Connect, sign a one-time challenge, and the Worker pays you everything you're owed across every unclaimed epoch in one transaction.</p></div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>$BEPE $LOVE • Holder rewards · 25% of every sale</p>
+      <p>
+        <a href="index.html">Home</a> •
+        <a href="play.html">Brawl</a> •
+        <a href="match.html">Match</a> •
+        <a href="https://github.com/FlipThisCrypto/-BEPE_-LOVE" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </footer>
+  </main>
+
+  <script type="module" src="js/wallet-ui.js"></script>
+  <script type="module" src="js/rewards.js"></script>
+</body>
+</html>

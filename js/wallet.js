@@ -124,6 +124,9 @@ export async function connect() {
           "chia_getWallets",
           "chia_getWalletBalance",
           "chia_signMessageByAddress",
+          // Sage's preferred address method (returns xch1 directly).
+          // Reference wallet uses chia_getCurrentAddress (in required).
+          "chia_getAddress",
         ],
         chains: [DEFAULT_CHAIN],
         events: [],
