@@ -169,7 +169,7 @@ curl -X POST https://bepelove.netlify.app/api/admin/bootstrap `
 ### Wallet Connect
 
 - Plain ES modules, no build step. `@walletconnect/sign-client@2.13.0` and `qrcode@1.5.4` loaded via `https://esm.sh`.
-- Project ID: `04650e37bf0643ffe10266d3d9e413b8` (client-visible by design — WalletConnect Cloud rate-limits per origin).
+- Project ID: `c0551420208febcb39a1daa852f64f74` (client-visible by design — WalletConnect Cloud rate-limits per origin).
 - Required RPC: `chia_logIn`. Optional: `chia_getCurrentAddress`, `chia_getNextAddress`, `chia_getWallets`, `chia_getWalletBalance`, `chia_takeOffer`, `chia_signMessageByAddress`. The `chia_takeOffer` request is staged for Phase 3b's mint flow but listed under optional namespaces so wallets without it still pair cleanly.
 - Score storage namespaces by wallet fingerprint. When connected, all writes go to `bepe.scores.<fingerprint>.v1`; when disconnected, to `bepe.scores.anon.v1`. Legacy `bepe.scores.v1` is auto-migrated on first load.
 

@@ -12,7 +12,7 @@
 import SignClient from "https://esm.sh/@walletconnect/sign-client@2.13.0";
 import QRCode from "https://esm.sh/qrcode@1.5.4";
 
-const PROJECT_ID = "04650e37bf0643ffe10266d3d9e413b8";
+const PROJECT_ID = "c0551420208febcb39a1daa852f64f74";
 const DEFAULT_CHAIN = "chia:mainnet";
 
 const METADATA = {
