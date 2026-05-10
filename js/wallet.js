@@ -121,11 +121,17 @@ export async function connect() {
     requiredNamespaces: {
       chia: {
         methods: [
-          // Methods supported by BOTH Sage and the Chia reference wallet.
-          // Anything wallet-specific goes in optional below — putting a
-          // wallet-specific method in required can cause stricter wallets
-          // (notably the reference wallet) to refuse pairing.
           "chia_logIn",
+          // Sage doesn't approve optional methods at pairing — needs these
+          // here so the runtime calls don't get rejected by sign-client's
+          // local check. Reference wallet typically approves required
+          // methods blindly even when it doesn't implement them; runtime
+          // calls fall back via getCurrentBech32Address's multi-method
+          // attempt loop. If a wallet flat-out refuses to pair when one of
+          // these is in required, that's the trade-off — rewards needs the
+          // xch1 address.
+          "chia_getAddress",
+          "chia_getCurrentAddress",
           "chia_takeOffer",
           "chia_signMessageByAddress",
         ],
@@ -136,13 +142,6 @@ export async function connect() {
     optionalNamespaces: {
       chia: {
         methods: [
-          // Sage's canonical address method. Reference wallet doesn't have
-          // this — leaving it optional means refs don't refuse pairing.
-          "chia_getAddress",
-          // Reference wallet's canonical. Sage doesn't implement this;
-          // leaving it optional avoids forcing approval of a method Sage
-          // can't fulfill (the source of the original 4001 errors).
-          "chia_getCurrentAddress",
           "chia_getNextAddress",
           "chia_getWallets",
           "chia_getWalletBalance",
