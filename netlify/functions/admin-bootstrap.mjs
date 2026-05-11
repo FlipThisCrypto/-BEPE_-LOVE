@@ -109,6 +109,124 @@ export default async (req) => {
       return json({ ok: true, wiped: "confirmed-set" });
     }
 
+    // Reconcile the ledger with on-chain reality.
+    //
+    // Queries Mintgarden's bulk owners endpoint (authoritative "what's actually
+    // been minted") and replaces our confirmed-set with that exact set. Also
+    // resets queue.counter to 0 and clears reservations so the dispenser
+    // re-scans the full shuffled list from the start.
+    //
+    // Use this to recover burned slots after a dispenser exploit or any other
+    // drift between the ledger and on-chain reality. Idempotent — safe to run
+    // multiple times.
+    //
+    // Body: { secret, action: "audit-on-chain", collectionId?: string }
+    if (body.action === "audit-on-chain") {
+      const COLLECTION_ID = body.collectionId
+        || "col15pq4u6mhqhqfpk8ysvjz2uln7lkleym6uxw4puu4vc45r9n0wv0qp7rhp7";
+      const MG = "https://api.mintgarden.io";
+
+      // 1. Pull every currently-held NFT in the collection.
+      const ownersRes = await fetch(`${MG}/collections/${COLLECTION_ID}/nfts/owners`);
+      if (!ownersRes.ok) {
+        return json({ error: "mintgarden_owners_failed", status: ownersRes.status }, 502);
+      }
+      const ownersList = await ownersRes.json();
+      const ownedLaunchers = new Set();
+      for (const o of (Array.isArray(ownersList) ? ownersList : [])) {
+        if (o?.encoded_id) ownedLaunchers.add(o.encoded_id);
+      }
+
+      // 2. Paginate the collection list to map launcher_id -> token_number
+      //    (via the NFT name, e.g. "Bepe Love #1247" -> 1247).
+      const launcherToToken = new Map();
+      let cursor = null;
+      for (let page = 0; page < 30; page++) {
+        const params = new URLSearchParams({ size: "100" });
+        if (cursor) params.set("page", cursor);
+        const listRes = await fetch(`${MG}/collections/${COLLECTION_ID}/nfts?${params}`);
+        if (!listRes.ok) break;
+        const listData = await listRes.json();
+        const items = listData?.items || [];
+        if (!items.length) break;
+        for (const n of items) {
+          const launcher = n?.encoded_id;
+          const name = typeof n?.name === "string" ? n.name : "";
+          const m = name.match(/#\s*(\d+)/);
+          if (launcher && m) {
+            launcherToToken.set(launcher, parseInt(m[1], 10));
+          }
+        }
+        cursor = listData?.next;
+        if (!cursor) break;
+      }
+
+      // 3. Build the actually-minted token set.
+      const onChainTokens = new Set();
+      for (const launcher of ownedLaunchers) {
+        const tok = launcherToToken.get(launcher);
+        if (typeof tok === "number" && tok >= 1 && tok <= 2222) {
+          onChainTokens.add(tok);
+        }
+      }
+
+      // 4. Read what the ledger said before, for the summary diff.
+      const beforeConfirmed = await queue.get("confirmed-set", { type: "json" });
+      const beforeTokens = new Set(beforeConfirmed?.tokens ?? []);
+
+      // 5. Write the new confirmed-set = on-chain truth.
+      const sortedTokens = [...onChainTokens].sort((a, b) => a - b);
+      const now = Date.now();
+      const entries = sortedTokens.map(t => ({
+        tokenNumber: t,
+        ts: now,
+        source: "audit-on-chain",
+      }));
+      await queue.setJSON("confirmed-set", { tokens: sortedTokens, entries });
+
+      // 6. Reset queue counter to 0 so the dispenser re-scans from the start
+      //    (recovering burned slots that are NOT actually on-chain).
+      const qResult = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
+      let counterReset = false;
+      if (qResult?.data && Array.isArray(qResult.data.shuffled)) {
+        const reset = { ...qResult.data, counter: 0 };
+        try {
+          await queue.setJSON("queue", reset, { onlyIfMatch: qResult.etag });
+          counterReset = true;
+        } catch (_) { /* CAS conflict — try once more */
+          const r2 = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
+          if (r2?.data) {
+            try {
+              await queue.setJSON("queue", { ...r2.data, counter: 0 }, { onlyIfMatch: r2.etag });
+              counterReset = true;
+            } catch (_) {}
+          }
+        }
+      }
+
+      // 7. Clear all reservations (stale draws shouldn't survive a reset).
+      await queue.delete("reservations").catch(() => {});
+
+      // 8. Wipe the dispensed audit log — stale data from the burned-slot era.
+      await queue.delete("dispensed").catch(() => {});
+
+      // Summary: what changed?
+      const added = sortedTokens.filter(t => !beforeTokens.has(t));      // newly locked
+      const removed = [...beforeTokens].filter(t => !onChainTokens.has(t)); // recovered
+
+      return json({
+        ok: true,
+        onChainTotal: sortedTokens.length,
+        ledgerBefore: beforeTokens.size,
+        ledgerAfter: sortedTokens.length,
+        addedToLedger: added.length,
+        recoveredToPool: removed.length,
+        counterReset,
+        reservationsCleared: true,
+        availableForMint: 2222 - sortedTokens.length,
+      });
+    }
+
     return json({ error: "unknown_action" }, 400);
   } catch (err) {
     return json({ error: "internal", detail: String(err.message || err) }, 500);
