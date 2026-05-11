@@ -68,10 +68,17 @@ export default async (req) => {
     try {
       await queue.setJSON(CONFIRMED_KEY, next, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
 
+      // Clear this wallet's reservation now that the mint is confirmed.
+      // Without this, the user would be locked to the same token for the
+      // full TTL window even though they've already minted it.
+      clearReservation(queue, tokenNum, fp).catch(err => console.warn("reservation clear failed:", err));
+
+      // Advance the queue counter past any newly-confirmed prefix. This is
+      // an optimization so the dispenser's scan starts at the next live
+      // index. Best-effort — incorrect values just slow the scan slightly.
+      advanceCounter(queue, next.tokens).catch(err => console.warn("counter advance failed:", err));
+
       // Best-effort cleanup: delete the offer blob now that it's been minted.
-      // The queue counter is already past this token so it can't be re-dispensed
-      // either way — this is just storage tidying. Failure here doesn't fail
-      // the confirm response.
       const offerKey = `offer/${String(tokenNum).padStart(4, "0")}`;
       offers.delete(offerKey).catch(err => console.warn(`offer cleanup failed for ${offerKey}:`, err));
 
@@ -96,4 +103,45 @@ function json(obj, status = 200) {
     status,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
+}
+
+// Remove the reservation that covers this confirmed token. Best-effort —
+// the dispenser also sweeps expired reservations, so failure here just means
+// the wallet stays locked to this (now-minted) token for the rest of its TTL.
+async function clearReservation(queue, tokenNum, fp) {
+  const result = await queue.getWithMetadata("reservations", { type: "json", consistency: "strong" });
+  if (!result) return;
+  const map = result.data ?? {};
+  let mutated = false;
+  // Prefer the fp match, fall back to any reservation pointing at this token
+  // (covers cases where confirm came in without a fingerprint).
+  for (const [k, r] of Object.entries(map)) {
+    if ((fp && k === fp && r?.tokenNumber === tokenNum) ||
+        (!fp && r?.tokenNumber === tokenNum)) {
+      delete map[k];
+      mutated = true;
+    }
+  }
+  if (mutated) {
+    try {
+      await queue.setJSON("reservations", map, { onlyIfMatch: result.etag });
+    } catch (_) { /* CAS conflict OK — dispenser sweeps stale entries */ }
+  }
+}
+
+// Advance the queue's `counter` past any contiguous prefix of confirmed tokens.
+// Just a hint for the dispenser scan — doesn't affect correctness if it's off.
+async function advanceCounter(queue, confirmedTokens) {
+  const confirmedSet = new Set(confirmedTokens);
+  const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
+  if (!result) return;
+  const q = result.data;
+  if (!q || !Array.isArray(q.shuffled)) return;
+  let c = q.counter ?? 0;
+  while (c < q.shuffled.length && confirmedSet.has(q.shuffled[c])) c++;
+  if (c !== q.counter) {
+    try {
+      await queue.setJSON("queue", { ...q, counter: c }, { onlyIfMatch: result.etag });
+    } catch (_) { /* CAS conflict OK */ }
+  }
 }

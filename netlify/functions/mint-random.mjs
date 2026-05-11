@@ -1,19 +1,38 @@
-// Random Mint dispenser — reads the shuffled queue, atomically pops the next
-// token number, fetches that offer, returns to client.
+// Random Mint dispenser — reservation-based.
 //
 // Endpoint: POST /api/mint/random
-// Body:    { walletFingerprint?: string, walletAddr?: string }  (optional, for audit)
-// Returns: { tokenNumber: number, offerText: string, remaining: number }
-//          or { error: "sold_out" } when the queue is empty
+// Body:    { walletFingerprint: string, walletAddr?: string }  (fp required)
+// Returns: { tokenNumber, offerText, claimToken, reserved: bool }
+//          or { error: "sold_out" }
+//
+// Anti-exploit design notes:
+//   The previous implementation advanced the queue counter on every dispense.
+//   That let a user click Mint -> see what they got -> reject -> click Mint
+//   again to "shuffle" through tokens until they hit a rare one, burning queue
+//   slots along the way. By the end of the run the public counter had outpaced
+//   reality by ~1500 burned slots.
+//
+//   The new design RESERVES tokens per wallet for a TTL window. While a user
+//   has an active reservation, every subsequent /api/mint/random call from
+//   that wallet returns the SAME token + same claim token. The user has one
+//   draw at a time — they can't cycle. After the TTL expires (10 min), the
+//   token returns to the pool. The queue counter only advances when a mint
+//   actually confirms on-chain.
 //
 // State stores:
-//   bepe-mint-offers  — key "offer/<NNNN>"  -> raw offer text
-//   bepe-mint-queue   — key "queue"         -> { shuffled: [N...], counter: N, total: N }
-//                       key "dispensed"     -> { items: [{ tokenNum, ts, fp, addr }] }
+//   bepe-mint-offers  — key "offer/<NNNN>"      -> raw offer text
+//   bepe-mint-queue   — key "queue"             -> { shuffled, counter, total }
+//                       key "confirmed-set"     -> { tokens, entries }
+//                       key "reservations"      -> { [fp]: { tokenNumber, ts, claimToken } }
+//                       key "claims/<token>"    -> { tokenNumber, ts, fp }
+//                       key "dispensed"         -> { items: [...] }
 
 import { getStore } from "@netlify/blobs";
 
-export default async (req, context) => {
+const RES_TTL_MS = 10 * 60 * 1000;   // 10 minutes per reservation
+const MAX_CAS_RETRIES = 5;
+
+export default async (req) => {
   if (req.method !== "POST" && req.method !== "GET") {
     return json({ error: "method_not_allowed" }, 405);
   }
@@ -24,128 +43,161 @@ export default async (req, context) => {
       const text = await req.text();
       body = text ? JSON.parse(text) : {};
     }
-  } catch (_) {
-    body = {};
+  } catch (_) { body = {}; }
+
+  // Wallet fingerprint required for reservation tracking.
+  const fp = typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null;
+  if (!fp) {
+    return json({
+      error: "wallet_required",
+      message: "Connect a Chia wallet first — required for the new per-wallet reservation system.",
+    }, 400);
   }
 
   const offers = getStore("bepe-mint-offers");
   const queue = getStore("bepe-mint-queue");
+  const now = Date.now();
 
-  // Read queue with strong consistency so we have a fresh ETag for CAS.
-  let q;
-  let etag;
-  try {
-    const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
-    if (!result) {
-      return json({ error: "not_initialized", message: "Mint queue has not been bootstrapped yet. Run scripts/upload_offers.mjs." }, 503);
-    }
-    q = result.data;
-    etag = result.etag;
-  } catch (err) {
-    return json({ error: "queue_read_failed", detail: String(err) }, 500);
-  }
+  // Read confirmed-set (best-effort, doesn't need CAS — only grows)
+  const confirmed = await queue.get("confirmed-set", { type: "json" });
+  const confirmedSet = new Set(confirmed?.tokens ?? []);
 
+  // Read queue (used for the shuffled list + counter as a scan hint)
+  const q = await queue.get("queue", { type: "json" });
   if (!q || !Array.isArray(q.shuffled)) {
-    return json({ error: "queue_corrupt" }, 500);
+    return json({ error: "not_initialized", message: "Mint queue has not been bootstrapped." }, 503);
   }
 
-  if (q.counter >= q.shuffled.length) {
-    return json({ error: "sold_out", remaining: 0 }, 410);
-  }
+  // CAS loop on the reservations blob — handles concurrent dispense attempts
+  // from multiple wallets without double-issuing a token.
+  for (let attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
+    const resResult = await queue.getWithMetadata("reservations", { type: "json", consistency: "strong" });
+    const reservations = resResult?.data ?? {};
+    const resEtag = resResult?.etag;
 
-  // Pop next token + fetch offer. If the offer text is missing in storage
-  // (e.g., a partial bootstrap), advance the counter past it and try the next
-  // one. Up to 30 skips to avoid wasting time but allow surviving a noisy
-  // bootstrap. Each pop uses ETag-based CAS to prevent concurrent dispenses
-  // handing out the same token.
-  let tokenNum = null;
-  let offerText = null;
-  const skipped = [];
-  const MAX_TRIES = 30;
-
-  for (let outer = 0; outer < MAX_TRIES; outer++) {
-    let popped = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      tokenNum = q.shuffled[q.counter];
-      const next = { ...q, counter: q.counter + 1 };
-      try {
-        await queue.setJSON("queue", next, { onlyIfMatch: etag });
-        popped = true;
-        break;
-      } catch (_) {
-        const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
-        if (!result) return json({ error: "queue_lost" }, 500);
-        q = result.data;
-        etag = result.etag;
-        if (q.counter >= q.shuffled.length) {
-          return json({ error: "sold_out", remaining: 0, skipped }, 410);
+    // Sweep expired entries.
+    for (const [k, r] of Object.entries(reservations)) {
+      if (now - (r?.ts ?? 0) > RES_TTL_MS) {
+        delete reservations[k];
+        // Best-effort claim cleanup
+        if (r?.claimToken) {
+          queue.delete(`claims/${r.claimToken}`).catch(() => {});
         }
-        tokenNum = null;
       }
     }
-    if (!popped) {
-      return json({ error: "queue_contention", skipped }, 503);
+
+    // If this wallet already has an active reservation, return the SAME token.
+    // This is the anti-cycling defense — rejecting and re-clicking yields the
+    // same draw, not a new random one.
+    if (reservations[fp]) {
+      const existing = reservations[fp];
+      let offerText = null;
+      try {
+        offerText = await offers.get(`offer/${pad(existing.tokenNumber)}`);
+      } catch (_) {}
+      if (offerText && offerText.startsWith("offer1")) {
+        return json({
+          tokenNumber: existing.tokenNumber,
+          offerText,
+          claimToken: existing.claimToken,
+          reserved: true,
+          reservedAtMs: existing.ts,
+          expiresAtMs: existing.ts + RES_TTL_MS,
+        });
+      }
+      // Offer text missing — bad reservation, clear and proceed to find a fresh one.
+      delete reservations[fp];
     }
 
-    // Try to fetch the offer for this token.
+    // Build the "currently reserved" token set (after expiry sweep).
+    const reservedTokens = new Set();
+    for (const r of Object.values(reservations)) {
+      if (r?.tokenNumber != null) reservedTokens.add(r.tokenNumber);
+    }
+
+    // Find the next available token by scanning the shuffled list from the
+    // counter forward (counter is a hint — the earliest index that might
+    // still be available). Skip tokens that are confirmed on-chain or
+    // currently reserved by someone else.
+    let tokenNum = null;
+    let offerText = null;
+    const skipped = [];
+    const start = Math.min(q.counter ?? 0, q.shuffled.length);
+    for (let i = start; i < q.shuffled.length; i++) {
+      const candidate = q.shuffled[i];
+      if (confirmedSet.has(candidate)) continue;
+      if (reservedTokens.has(candidate)) continue;
+      // Verify the offer exists in storage (defends against partial bootstraps).
+      let t = null;
+      try { t = await offers.get(`offer/${pad(candidate)}`); } catch (_) {}
+      if (!t || !t.startsWith("offer1")) {
+        skipped.push(candidate);
+        if (skipped.length > 50) {
+          return json({ error: "too_many_missing_offers", skipped: skipped.slice(0, 20) }, 500);
+        }
+        continue;
+      }
+      tokenNum = candidate;
+      offerText = t;
+      break;
+    }
+
+    if (tokenNum == null) {
+      return json({ error: "sold_out", remaining: 0 }, 410);
+    }
+
+    // Create reservation + claim token.
+    const claimToken = randomToken();
+    reservations[fp] = { tokenNumber: tokenNum, ts: now, claimToken };
+
+    // Atomic CAS write of the reservations blob.
     try {
-      offerText = await offers.get(`offer/${pad(tokenNum)}`);
+      if (resEtag) {
+        await queue.setJSON("reservations", reservations, { onlyIfMatch: resEtag });
+      } else {
+        await queue.setJSON("reservations", reservations, { onlyIfNew: true });
+      }
     } catch (err) {
-      // Hard storage error — bail.
-      return json({ error: "offer_read_failed", tokenNumber: tokenNum, detail: String(err) }, 500);
+      // CAS conflict — someone else updated reservations. Retry.
+      if (attempt === MAX_CAS_RETRIES - 1) {
+        return json({ error: "reservation_contention", detail: String(err?.message || err) }, 503);
+      }
+      continue;
     }
 
-    if (offerText && offerText.startsWith("offer1")) break;
-
-    // Missing or malformed — log and try the next token.
-    skipped.push(tokenNum);
-    offerText = null;
-    tokenNum = null;
-    // Refresh queue snapshot before next loop.
-    const result = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
-    if (!result) return json({ error: "queue_lost" }, 500);
-    q = result.data;
-    etag = result.etag;
-    if (q.counter >= q.shuffled.length) {
-      return json({ error: "sold_out", remaining: 0, skipped }, 410);
-    }
-  }
-
-  if (!offerText) {
-    return json({ error: "no_valid_offer_found", skipped, hint: "Re-run scripts/upload_offers.mjs --force to repopulate offers." }, 500);
-  }
-
-  // Generate a one-time claim token tied to this dispense. The frontend will
-  // include it in /api/mint/confirm; the confirm endpoint validates the claim
-  // matches the token number, then deletes it. This prevents anyone from
-  // pumping the public mint counter by hitting /api/mint/confirm directly.
-  const claimToken = randomToken();
-  await queue.setJSON(`claims/${claimToken}`, {
-    tokenNumber: tokenNum,
-    ts: Date.now(),
-    fp: typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null,
-  }).catch(err => console.warn("claim store failed:", err));
-
-  // Audit log (best-effort, non-blocking failure).
-  try {
-    const dispensedEntry = {
+    // Store the claim token (also used to authenticate the confirm POST).
+    await queue.setJSON(`claims/${claimToken}`, {
       tokenNumber: tokenNum,
-      ts: Date.now(),
-      fp: typeof body.walletFingerprint === "string" ? body.walletFingerprint.slice(0, 32) : null,
-      addr: typeof body.walletAddr === "string" ? body.walletAddr.slice(0, 80) : null,
-    };
-    const log = (await queue.get("dispensed", { type: "json" })) || { items: [] };
-    log.items.push(dispensedEntry);
-    if (log.items.length > 5000) log.items = log.items.slice(-5000);
-    await queue.setJSON("dispensed", log);
-  } catch (_) { /* not critical */ }
+      ts: now,
+      fp,
+    }).catch(err => console.warn("claim store failed:", err));
 
-  return json({
-    tokenNumber: tokenNum,
-    offerText,
-    remaining: Math.max(0, q.shuffled.length - q.counter - 1),
-    claimToken,
-  });
+    // Audit log (best-effort).
+    try {
+      const dispensedEntry = {
+        tokenNumber: tokenNum,
+        ts: now,
+        fp,
+        addr: typeof body.walletAddr === "string" ? body.walletAddr.slice(0, 80) : null,
+        reserved: true,
+      };
+      const log = (await queue.get("dispensed", { type: "json" })) || { items: [] };
+      log.items.push(dispensedEntry);
+      if (log.items.length > 5000) log.items = log.items.slice(-5000);
+      await queue.setJSON("dispensed", log);
+    } catch (_) {}
+
+    return json({
+      tokenNumber: tokenNum,
+      offerText,
+      claimToken,
+      reserved: false,
+      reservedAtMs: now,
+      expiresAtMs: now + RES_TTL_MS,
+    });
+  }
+
+  return json({ error: "reservation_contention" }, 503);
 };
 
 export const config = {
@@ -153,7 +205,6 @@ export const config = {
 };
 
 function randomToken() {
-  // 22 url-safe chars from crypto-grade randomness via globalThis.crypto.
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return [...bytes].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 22);
@@ -162,10 +213,7 @@ function randomToken() {
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "no-store",
-    },
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 }
 

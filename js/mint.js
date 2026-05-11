@@ -83,7 +83,18 @@ async function onMintClick() {
   // 3. Push the offer into the wallet via WalletConnect — only path. If this
   // fails (e.g., the wallet hasn't approved chia_takeOffer at pairing time),
   // tell the user how to fix it (disconnect + reconnect).
-  if (status) { status.className = "mint-status info"; status.textContent = `Got Bepe Love #${pad(offerData.tokenNumber)} — approve in your wallet…`; }
+  //
+  // ANTI-EXPLOIT NOTE: deliberately do NOT reveal the token number here.
+  // Showing it pre-approval let users reject undesired draws and click again
+  // to cycle for rarities. Sage still shows the NFT name in its own approval
+  // screen — but the dispenser now reserves the token per-wallet so
+  // rejecting and re-clicking just returns the same token for the TTL window.
+  if (status) {
+    status.className = "mint-status info";
+    status.textContent = offerData.reserved
+      ? "Resuming your reserved Bepe — approve in your wallet…"
+      : "Offer ready — approve the mint in your Chia wallet…";
+  }
   let takeResult;
   try {
     takeResult = await takeOfferViaWallet(offerData.offerText);
