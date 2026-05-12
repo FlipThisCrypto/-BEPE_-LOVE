@@ -138,20 +138,50 @@ async function onMintClick() {
 }
 
 async function takeOfferViaWallet(offerText) {
-  // Uses the shared sign-client session from wallet.js so the namespaces
-  // approved at pairing time apply.
+  // Strict success detection. Only fire /api/mint/confirm (which clears the
+  // wallet's reservation) when we have POSITIVE evidence that Sage actually
+  // broadcast the take. Anything ambiguous → treat as a non-success so the
+  // reservation persists for the full TTL.
+  //
+  // Sage's successful takeOffer returns an object with at least one of:
+  //   tradeId / trade_id / tradeRecord / trade_record / spendBundle /
+  //   spend_bundle / success: true
+  // Any of those = real take broadcast. Without any of them, the wallet
+  // either rejected, errored out, or returned a non-broadcasting
+  // acknowledgement — none of which should advance the mint state.
   try {
     const result = await requestRpc("chia_takeOffer", {
       offer: offerText,
       fee: 0,
     });
-    if (result?.success === false) {
+
+    if (!result || typeof result !== "object") {
+      return { ok: false, reason: "Wallet returned empty response" };
+    }
+    if (result.success === false) {
       return { ok: false, reason: result.error || "Wallet rejected the offer" };
     }
+    if (result.error || result.rejected) {
+      return { ok: false, reason: result.error || "Wallet rejected" };
+    }
+
+    const hasPositiveSuccessMarker =
+      result.success === true ||
+      result.tradeId ||
+      result.trade_id ||
+      result.tradeRecord ||
+      result.trade_record ||
+      result.spendBundle ||
+      result.spend_bundle;
+
+    if (!hasPositiveSuccessMarker) {
+      console.warn("takeOffer returned ambiguous response (treating as not-yet-successful):", result);
+      return { ok: false, reason: "Wallet response was unclear — your reservation stays active for 10 minutes. Click Mint again to retry." };
+    }
+
     return { ok: true, raw: result };
   } catch (err) {
     const msg = err.message || String(err);
-    // Surface a clearer message when the method wasn't approved at pairing.
     if (/Missing or invalid|not approved/i.test(msg)) {
       return { ok: false, reason: "Wallet didn't approve chia_takeOffer at pairing — disconnect and reconnect to grant the new permission." };
     }
