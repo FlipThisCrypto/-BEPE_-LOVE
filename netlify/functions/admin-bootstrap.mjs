@@ -184,6 +184,22 @@ export default async (req) => {
       }));
       await queue.setJSON("confirmed-set", { tokens: sortedTokens, entries });
 
+      // 5b. Reconcile pending-set against the new confirmed-set:
+      //   - tokens now on-chain → drop from pending (they've graduated)
+      //   - tokens NOT on-chain AND older than 1 hour → drop (failed mint,
+      //     return slot to the dispensable pool)
+      //   - tokens NOT on-chain AND less than 1 hour → keep (still in-flight)
+      const PENDING_TTL_MS = 60 * 60 * 1000; // 1 hour
+      const pendingRaw = await queue.get("pending-set", { type: "json" });
+      const pending = pendingRaw?.entries ?? [];
+      const stillPending = pending.filter(p => {
+        if (onChainTokens.has(p.tokenNumber)) return false; // graduated to confirmed
+        if (now - (p.ts ?? 0) > PENDING_TTL_MS) return false; // expired, free the slot
+        return true; // still in-flight
+      });
+      const pendingPromoted = pending.length - stillPending.length;
+      await queue.setJSON("pending-set", { entries: stillPending });
+
       // 6. Reset queue counter to 0 so the dispenser re-scans from the start
       //    (recovering burned slots that are NOT actually on-chain).
       const qResult = await queue.getWithMetadata("queue", { type: "json", consistency: "strong" });
@@ -221,9 +237,11 @@ export default async (req) => {
         ledgerAfter: sortedTokens.length,
         addedToLedger: added.length,
         recoveredToPool: removed.length,
+        pendingResolved: pendingPromoted,
+        pendingRemaining: stillPending.length,
         counterReset,
         reservationsCleared: true,
-        availableForMint: 2222 - sortedTokens.length,
+        availableForMint: 2222 - sortedTokens.length - stillPending.length,
       });
     }
 

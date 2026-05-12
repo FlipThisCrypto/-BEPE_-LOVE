@@ -58,9 +58,14 @@ export default async (req) => {
   const queue = getStore("bepe-mint-queue");
   const now = Date.now();
 
-  // Read confirmed-set (best-effort, doesn't need CAS — only grows)
+  // Read confirmed-set (on-chain verified) AND pending-set (claimed by
+  // wallet, awaiting on-chain verification). Skip both during dispense.
+  // Without skipping pending, two users could claim the same token and
+  // race the chain — only one wins, the other wallet shows an error.
   const confirmed = await queue.get("confirmed-set", { type: "json" });
   const confirmedSet = new Set(confirmed?.tokens ?? []);
+  const pending = await queue.get("pending-set", { type: "json" });
+  const pendingSet = new Set((pending?.entries ?? []).map(e => e.tokenNumber));
 
   // Read queue (used for the shuffled list + counter as a scan hint)
   const q = await queue.get("queue", { type: "json" });
@@ -126,6 +131,7 @@ export default async (req) => {
     for (let i = start; i < q.shuffled.length; i++) {
       const candidate = q.shuffled[i];
       if (confirmedSet.has(candidate)) continue;
+      if (pendingSet.has(candidate)) continue;
       if (reservedTokens.has(candidate)) continue;
       // Verify the offer exists in storage (defends against partial bootstraps).
       let t = null;

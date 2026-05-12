@@ -23,15 +23,22 @@ export default async () => {
   const queue = getStore("bepe-mint-queue");
   const offers = getStore("bepe-mint-offers");
 
-  const [confirmedRaw, q, log] = await Promise.all([
+  const [confirmedRaw, pendingRaw, q, log] = await Promise.all([
     queue.get("confirmed-set", { type: "json" }),
+    queue.get("pending-set", { type: "json" }),
     queue.get("queue", { type: "json" }),
     queue.get("dispensed", { type: "json" }),
   ]);
 
   const confirmed = confirmedRaw?.tokens ?? [];
+  const pendingEntries = pendingRaw?.entries ?? [];
+  // "minted" = on-chain verified only. Pending mints (wallet approved,
+  // chain not yet confirmed) are NOT counted as minted to prevent the
+  // counter pumping exploit. They are subtracted from `remaining` so
+  // users don't double-claim the same token.
   const minted = confirmed.length + PRE_MINTED.length;
-  const remaining = Math.max(0, COLLECTION_TOTAL - minted);
+  const pending = pendingEntries.length;
+  const remaining = Math.max(0, COLLECTION_TOTAL - minted - pending);
 
   // Diagnostic: count blobs in the offers store. Best-effort.
   let offerCount = 0;
@@ -53,8 +60,9 @@ export default async () => {
   return json({
     // User-facing
     total: COLLECTION_TOTAL,
-    minted,
-    remaining,
+    minted,                       // on-chain verified
+    pending,                      // wallet-claimed, awaiting chain reconcile
+    remaining,                    // total - minted - pending
     confirmedViaSite: confirmed.length,
     preMinted: PRE_MINTED.length,
     recent: recentEntries,
