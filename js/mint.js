@@ -217,47 +217,42 @@ function showResult(res) {
     `;
   } else if (res.kind === "wallet-error") {
     const isPermErr = /Missing or invalid|not approved|disapproved|disconnect and reconnect/i.test(res.reason || "");
-    const isUnsupported = /Invalid Request|UNSUPPORTED_METHODS|method not found/i.test(res.reason || "");
-
-    // Always offer the offer-file download — no XCH has been spent yet, and
-    // every Chia wallet can import an offer file manually. This is the
-    // safety net for anyone not on Sage.
-    const blob = res.offerText ? new Blob([res.offerText], { type: "text/plain" }) : null;
-    const downloadUrl = blob ? URL.createObjectURL(blob) : null;
+    // Reveal image + trait NAMES (helps the user know what they're holding)
+    // but NOT rarity or points — those stay hidden until the mint actually
+    // confirms on-chain. This is part of the anti-gaming layer: a holder
+    // can't easily decide "skip and retry" based on tier rarity.
+    const nft = res.tokenNumber ? manifest.find(n => n.id === res.tokenNumber) : null;
 
     panel.innerHTML = `
       <div class="mint-result-card fallback">
         <div class="mint-result-head">
-          <span class="mr-emoji">📥</span>
-          <h3>Mint Bepe Love #${pad(res.tokenNumber)} manually</h3>
+          <span class="mr-emoji">🔒</span>
+          <h3>Your Bepe is reserved</h3>
         </div>
 
-        <p><b>No XCH has been spent</b> — your wallet rejected the auto-mint request before any transaction. The offer for #${pad(res.tokenNumber)} is still claimable; you just need to import it manually.</p>
+        <p><b>No XCH has been spent</b> — your wallet rejected the auto-mint request before any transaction. The offer is still claimable; just click <b>Mint a Random Bepe</b> again to retry. This Bepe is locked to your wallet for the next 10 minutes — no one else can grab it during that window.</p>
 
-        <p style="margin: 14px 0 6px;"><b>Why this happened:</b> ${
-          isPermErr
-            ? "your wallet session was paired before <code>chia_takeOffer</code> was a required permission. Disconnect and reconnect once and the next mint should be one-click."
-            : isUnsupported
-              ? "your wallet doesn't support <code>chia_takeOffer</code> over WalletConnect yet. <b>Sage Wallet</b> is the recommended wallet for one-click mint. Other wallets need the manual import below."
-              : `the wallet returned <code>${escapeHtml(res.reason || "unknown reason")}</code>.`
-        }</p>
-
-        ${downloadUrl ? `
-          <p style="margin-top: 18px;">
-            <a class="btn primary" href="${downloadUrl}" download="bepe_love_${pad(res.tokenNumber)}.offer">⬇ Download offer file</a>
-          </p>
-          <ol class="mint-instructions">
-            <li>Open your Chia wallet.</li>
-            <li>Go to <b>Offers</b> → <b>View an Offer</b> (or <b>Take an Offer</b>).</li>
-            <li>Drag the downloaded file in (or paste its contents).</li>
-            <li>Confirm the <b>2 XCH</b> payment and accept.</li>
-            <li>Bepe Love #${pad(res.tokenNumber)} arrives in ~30 seconds.</li>
-          </ol>
+        ${nft ? `
+          <div class="mint-result-body" style="margin-top: 16px;">
+            <img src="${nft.card}" alt="Your reserved Bepe" />
+            <div class="mint-result-info" style="font-size: 13px;">
+              <p style="margin: 0 0 8px; color: var(--ink); font-weight: 700;">This Bepe wears:</p>
+              <ul style="margin: 0; padding: 0; list-style: none; line-height: 1.7;">
+                <li>🎨 ${escapeHtml(nft.traits.background)}</li>
+                <li>🙂 ${escapeHtml(nft.traits.face)}</li>
+                <li>👀 ${escapeHtml(nft.traits.eyes)}</li>
+                <li>👄 ${escapeHtml(nft.traits.mouth)}</li>
+                <li>🧥 ${escapeHtml(nft.traits.jacket)}</li>
+                <li>🏷 ${escapeHtml(nft.traits.patch)}</li>
+                <li>✨ ${escapeHtml(nft.traits.accessory)}</li>
+              </ul>
+            </div>
+          </div>
         ` : ""}
 
         ${isPermErr ? `
-          <p style="margin-top: 14px; color: var(--ink-2); font-size: 13px;">
-            <b>Or skip the manual step:</b> click the wallet button (top right) → <b>Disconnect</b> → <b>Connect Wallet</b> → approve the new permissions in your wallet, then click Mint again.
+          <p style="margin-top: 16px; color: var(--ink-2); font-size: 13px;">
+            <b>Tip:</b> if your wallet keeps rejecting, click the wallet button (top right) → <b>Disconnect</b> → <b>Connect Wallet</b> → approve the permissions again, then click Mint.
           </p>
         ` : ""}
       </div>
